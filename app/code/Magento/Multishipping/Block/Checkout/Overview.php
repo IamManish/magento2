@@ -75,6 +75,38 @@ class Overview extends \Magento\Sales\Block\Items\AbstractItems
     }
 
     /**
+     * Overwrite the total value of shipping amount for viewing purpose
+     *
+     * @param  $totals
+     * @return mixed
+     * @throws \Exception
+     */
+    private function getMultishippingTotals($totals)
+    {
+        if (isset($totals['shipping']) && !empty($totals['shipping'])) {
+            $total = $totals['shipping'];
+            $shippingMethod = $total->getAddress()->getShippingMethod();
+            if (isset($shippingMethod) && !empty($shippingMethod)) {
+                $shippingRate = $total->getAddress()->getShippingRateByCode($shippingMethod);
+                $shippingPrice = $shippingRate->getPrice();
+            } else {
+                $shippingPrice = $total->getAddress()->getShippingAmount();
+            }
+
+            /**
+             * @var \Magento\Store\Api\Data\StoreInterface
+             */
+            $store = $this->getQuote()->getStore();
+            $amountPrice = $store->getBaseCurrency()
+                ->convert($shippingPrice, $store->getCurrentCurrencyCode());
+            $total->setBaseShippingAmount($shippingPrice);
+            $total->setShippingAmount($amountPrice);
+            $total->setValue($amountPrice);
+        }
+        return $totals;
+    }
+
+    /**
      * Initialize default item renderer
      *
      * @return $this
@@ -120,11 +152,7 @@ class Overview extends \Magento\Sales\Block\Items\AbstractItems
      */
     public function getPayment()
     {
-        if (!$this->hasData('payment')) {
-            $payment = new \Magento\Framework\DataObject($this->getRequest()->getPost('payment'));
-            $this->setData('payment', $payment);
-        }
-        return $this->_getData('payment');
+        return $this->getCheckout()->getQuote()->getPayment();
     }
 
     /**
@@ -168,7 +196,8 @@ class Overview extends \Magento\Sales\Block\Items\AbstractItems
      */
     public function getShippingPriceInclTax($address)
     {
-        $exclTax = $address->getShippingAmount();
+        $rate = $address->getShippingRateByCode($address->getShippingMethod());
+        $exclTax = $rate->getPrice();
         $taxAmount = $address->getShippingTaxAmount();
         return $this->formatPrice($exclTax + $taxAmount);
     }
@@ -179,7 +208,9 @@ class Overview extends \Magento\Sales\Block\Items\AbstractItems
      */
     public function getShippingPriceExclTax($address)
     {
-        return $this->formatPrice($address->getShippingAmount());
+        $rate = $address->getShippingRateByCode($address->getShippingMethod());
+        $shippingAmount = $rate->getPrice();
+        return $this->formatPrice($shippingAmount);
     }
 
     /**
@@ -200,9 +231,9 @@ class Overview extends \Magento\Sales\Block\Items\AbstractItems
 
     /**
      * @param Address $address
-     * @return mixed
+     * @return array
      */
-    public function getShippingAddressItems($address)
+    public function getShippingAddressItems($address): array
     {
         return $address->getAllVisibleItems();
     }
@@ -309,16 +340,7 @@ class Overview extends \Magento\Sales\Block\Items\AbstractItems
      */
     public function getVirtualItems()
     {
-        $items = [];
-        foreach ($this->getBillingAddress()->getItemsCollection() as $_item) {
-            if ($_item->isDeleted()) {
-                continue;
-            }
-            if ($_item->getProduct()->getIsVirtual() && !$_item->getParentItemId()) {
-                $items[] = $_item;
-            }
-        }
-        return $items;
+        return $this->getBillingAddress()->getAllVisibleItems();
     }
 
     /**
@@ -332,9 +354,19 @@ class Overview extends \Magento\Sales\Block\Items\AbstractItems
     }
 
     /**
+     * @deprecated
+     * typo in method name, see getBillingAddressTotals()
      * @return mixed
      */
     public function getBillinAddressTotals()
+    {
+        return $this->getBillingAddressTotals();
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getBillingAddressTotals()
     {
         $address = $this->getQuote()->getBillingAddress();
         return $this->getShippingAddressTotals($address);
@@ -347,6 +379,9 @@ class Overview extends \Magento\Sales\Block\Items\AbstractItems
      */
     public function renderTotals($totals, $colspan = null)
     {
+        //check if the shipment is multi shipment
+        $totals = $this->getMultishippingTotals($totals);
+
         if ($colspan === null) {
             $colspan = 3;
         }

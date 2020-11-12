@@ -51,9 +51,18 @@ class SubscriptionStatusLabelTest extends \PHPUnit\Framework\TestCase
             ->disableOriginalConstructor()
             ->getMock();
         $this->abstractElementMock = $this->getMockBuilder(AbstractElement::class)
-            ->setMethods(['getComment'])
+            ->setMethods(['getComment', 'getHtmlId', 'getName'])
             ->disableOriginalConstructor()
             ->getMock();
+
+        $objectManager = new ObjectManager($this);
+        $escaper = $objectManager->getObject(\Magento\Framework\Escaper::class);
+        $objectManager->setBackwardCompatibleProperty(
+            $this->abstractElementMock,
+            '_escaper',
+            $escaper
+        );
+
         $this->formMock = $this->getMockBuilder(Form::class)
             ->disableOriginalConstructor()
             ->getMock();
@@ -77,7 +86,7 @@ class SubscriptionStatusLabelTest extends \PHPUnit\Framework\TestCase
         $this->abstractElementMock->expects($this->any())
             ->method('getComment')
             ->willReturn('Subscription status: Enabled');
-        $this->assertRegexp(
+        $this->assertRegExp(
             "/Subscription status: Enabled/",
             $this->subscriptionStatusLabel->render($this->abstractElementMock)
         );

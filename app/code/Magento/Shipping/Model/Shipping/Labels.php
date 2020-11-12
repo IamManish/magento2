@@ -4,8 +4,6 @@
  * See COPYING.txt for license details.
  */
 
-// @codingStandardsIgnoreFile
-
 namespace Magento\Shipping\Model\Shipping;
 
 use Magento\Framework\DataObject;
@@ -117,8 +115,8 @@ class Labels extends \Magento\Shipping\Model\Shipping
             )
         );
 
-        if (!$admin->getFirstname()
-            || !$admin->getLastname()
+        if (!$admin->getFirstName()
+            || !$admin->getLastName()
             || !$storeInfo->getName()
             || !$storeInfo->getPhone()
             || !$originStreet1
@@ -140,7 +138,8 @@ class Labels extends \Magento\Shipping\Model\Shipping
         ) {
             throw new LocalizedException(
                 __(
-                    'We don\'t have enough information to create shipping labels. Please make sure your store information and settings are complete.'
+                    'We don\'t have enough information to create shipping labels. "
+                    . "Please make sure your store information and settings are complete.'
                 )
             );
         }
@@ -187,8 +186,8 @@ class Labels extends \Magento\Shipping\Model\Shipping
         );
 
         $request->setShipperContactPersonName($storeAdmin->getName());
-        $request->setShipperContactPersonFirstName($storeAdmin->getFirstname());
-        $request->setShipperContactPersonLastName($storeAdmin->getLastname());
+        $request->setShipperContactPersonFirstName($storeAdmin->getFirstName());
+        $request->setShipperContactPersonLastName($storeAdmin->getLastName());
         $request->setShipperContactCompanyName($store->getName());
         $request->setShipperContactPhoneNumber($store->getPhone());
         $request->setShipperEmail($storeAdmin->getEmail());

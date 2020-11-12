@@ -1,11 +1,8 @@
 <?php
 /**
- *
  * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
-
-// @codingStandardsIgnoreFile
 
 namespace Magento\PageCache\Test\Unit\Controller\Block;
 
@@ -130,6 +127,9 @@ class EsiTest extends \PHPUnit\Framework\TestCase
         $this->action->execute();
     }
 
+    /**
+     * @return array
+     */
     public function executeDataProvider()
     {
         return [

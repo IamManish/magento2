@@ -5,10 +5,12 @@
  */
 namespace Magento\Swatches\Test\Unit\Block\Product\Renderer\Listing;
 
+use Magento\Catalog\Model\Product\Attribute\Source\Status;
 use Magento\Swatches\Block\Product\Renderer\Configurable;
 
 /**
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @SuppressWarnings(PHPMD.TooManyFields)
  */
 class ConfigurableTest extends \PHPUnit\Framework\TestCase
 {
@@ -57,6 +59,24 @@ class ConfigurableTest extends \PHPUnit\Framework\TestCase
     /** @var \Magento\Framework\UrlInterface|\PHPUnit_Framework_MockObject_MockObject  */
     private $urlBuilder;
 
+    /** @var \PHPUnit_Framework_MockObject_MockObject */
+    private $variationPricesMock;
+
+    /** @var \PHPUnit_Framework_MockObject_MockObject */
+    private $layerResolverMock;
+
+    /** @var ObjectManagerHelper */
+    private $objectManagerHelper;
+
+    /** @var \Magento\Store\Model\StoreManagerInterface|\PHPUnit_Framework_MockObject_MockObject */
+    private $storeManagerMock;
+
+    /** @var \Magento\Customer\Model\Session|\PHPUnit_Framework_MockObject_MockObject */
+    private $customerSessionMock;
+
+    /**
+     * @inheritdoc
+     */
     public function setUp()
     {
         $this->arrayUtils = $this->createMock(\Magento\Framework\Stdlib\ArrayUtils::class);
@@ -75,9 +95,38 @@ class ConfigurableTest extends \PHPUnit\Framework\TestCase
         $this->scopeConfig = $this->createMock(\Magento\Framework\App\Config\ScopeConfigInterface::class);
         $this->imageHelper = $this->createMock(\Magento\Catalog\Helper\Image::class);
         $this->urlBuilder = $this->createMock(\Magento\Framework\UrlInterface::class);
+        $this->variationPricesMock = $this->createMock(
+            \Magento\ConfigurableProduct\Model\Product\Type\Configurable\Variations\Prices::class
+        );
+        $this->layerResolverMock = $this->createMock(\Magento\Catalog\Model\Layer\Resolver::class);
 
-        $objectManagerHelper = new \Magento\Framework\TestFramework\Unit\Helper\ObjectManager($this);
-        $this->configurable = $objectManagerHelper->getObject(
+        $this->storeManagerMock = $this->getMockBuilder(\Magento\Store\Model\StoreManagerInterface::class)
+            ->setMethods(['getStore'])
+            ->getMockForAbstractClass();
+        $this->customerSessionMock = $this->getMockBuilder(\Magento\Customer\Model\Session::class)
+            ->disableOriginalConstructor()
+            ->setMethods(['getCustomerGroupId'])
+            ->getMock();
+
+        $this->objectManagerHelper = new \Magento\Framework\TestFramework\Unit\Helper\ObjectManager($this);
+        $this->prepareObjectManager([
+            [
+                \Magento\Framework\Locale\Format::class,
+                $this->createMock(\Magento\Framework\Locale\Format::class),
+            ],
+            [
+                \Magento\ConfigurableProduct\Model\Product\Type\Configurable\Variations\Prices::class,
+                $this->createMock(
+                    \Magento\ConfigurableProduct\Model\Product\Type\Configurable\Variations\Prices::class
+                ),
+            ],
+            [
+                \Magento\Customer\Model\Session::class,
+                $this->customerSessionMock,
+            ],
+        ]);
+
+        $this->configurable = $this->objectManagerHelper->getObject(
             \Magento\Swatches\Block\Product\Renderer\Listing\Configurable::class,
             [
                 'scopeConfig' => $this->scopeConfig,
@@ -93,7 +142,14 @@ class ConfigurableTest extends \PHPUnit\Framework\TestCase
                 'priceCurrency' => $this->priceCurrency,
                 'configurableAttributeData' => $this->configurableAttributeData,
                 'data' => [],
+                'variationPrices' => $this->variationPricesMock,
+                'layerResolver' => $this->layerResolverMock,
             ]
+        );
+        $this->objectManagerHelper->setBackwardCompatibleProperty(
+            $this->configurable,
+            '_storeManager',
+            $this->storeManagerMock
         );
     }
 
@@ -122,14 +178,16 @@ class ConfigurableTest extends \PHPUnit\Framework\TestCase
         $this->configurable->setProduct($this->product);
         $this->swatchHelper->expects($this->once())->method('getSwatchAttributesAsArray')
             ->with($this->product)
-            ->willReturn([
-                1 => [
-                    'options' => [1 => 'testA', 3 => 'testB'],
-                    'use_product_image_for_swatch' => true,
-                    'used_in_product_listing' => false,
-                    'attribute_code' => 'code',
-                ],
-            ]);
+            ->willReturn(
+                [
+                    1 => [
+                        'options' => [1 => 'testA', 3 => 'testB'],
+                        'use_product_image_for_swatch' => true,
+                        'used_in_product_listing' => false,
+                        'attribute_code' => 'code',
+                    ],
+                ]
+            );
         $this->swatchHelper->expects($this->once())->method('getSwatchesByOptionsId')
             ->willReturn([]);
         $this->jsonEncoder->expects($this->once())->method('encode')->with([]);
@@ -155,19 +213,19 @@ class ConfigurableTest extends \PHPUnit\Framework\TestCase
         $this->configurable->setProduct($this->product);
         $this->swatchHelper->expects($this->once())->method('getSwatchAttributesAsArray')
             ->with($this->product)
-            ->willReturn([
-                1 => [
-                    'options' => $products,
-                    'use_product_image_for_swatch' => true,
-                    'used_in_product_listing' => true,
-                    'attribute_code' => 'code',
-                ],
-            ]);
+            ->willReturn(
+                [
+                    1 => [
+                        'options' => $products,
+                        'use_product_image_for_swatch' => true,
+                        'used_in_product_listing' => true,
+                        'attribute_code' => 'code',
+                    ],
+                ]
+            );
         $this->swatchHelper->expects($this->once())->method('getSwatchesByOptionsId')
             ->with([1, 3])
-            ->willReturn([
-                3 => ['type' => $expected['type'], 'value' => $expected['value']]
-            ]);
+            ->willReturn([3 => ['type' => $expected['type'], 'value' => $expected['value']]]);
         $this->jsonEncoder->expects($this->once())->method('encode');
         $this->configurable->getJsonSwatchConfig();
     }
@@ -175,11 +233,13 @@ class ConfigurableTest extends \PHPUnit\Framework\TestCase
     private function prepareGetJsonSwatchConfig()
     {
         $product1 = $this->createMock(\Magento\Catalog\Model\Product::class);
-        $product1->expects($this->atLeastOnce())->method('isSaleable')->willReturn(true);
+        $product1->expects($this->any())->method('isSaleable')->willReturn(true);
+        $product1->expects($this->atLeastOnce())->method('getStatus')->willReturn(Status::STATUS_ENABLED);
         $product1->expects($this->any())->method('getData')->with('code')->willReturn(1);
 
         $product2 = $this->createMock(\Magento\Catalog\Model\Product::class);
-        $product2->expects($this->atLeastOnce())->method('isSaleable')->willReturn(true);
+        $product2->expects($this->any())->method('isSaleable')->willReturn(true);
+        $product2->expects($this->atLeastOnce())->method('getStatus')->willReturn(Status::STATUS_ENABLED);
         $product2->expects($this->any())->method('getData')->with('code')->willReturn(3);
 
         $simpleProducts = [$product1, $product2];
@@ -200,5 +260,81 @@ class ConfigurableTest extends \PHPUnit\Framework\TestCase
 
         $this->helper->expects($this->any())->method('getAllowAttributes')->with($this->product)
             ->willReturn([$attribute1]);
+    }
+
+    public function testGetPricesJson()
+    {
+        $expectedPrices = [
+            'oldPrice' => [
+                'amount' => 10,
+            ],
+            'basePrice' => [
+                'amount' => 15,
+            ],
+            'finalPrice' => [
+                'amount' => 20,
+            ],
+        ];
+
+        $priceInfoMock = $this->createMock(\Magento\Framework\Pricing\PriceInfo\Base::class);
+        $this->configurable->setProduct($this->product);
+        $this->product->expects($this->once())->method('getPriceInfo')->willReturn($priceInfoMock);
+        $this->variationPricesMock->expects($this->once())
+            ->method('getFormattedPrices')
+            ->with($priceInfoMock)
+            ->willReturn($expectedPrices);
+
+        $this->jsonEncoder->expects($this->once())->method('encode')->with($expectedPrices);
+        $this->configurable->getPricesJson();
+    }
+
+    /**
+     * @param $map
+     */
+    private function prepareObjectManager($map)
+    {
+        $objectManagerMock = $this->getMockBuilder(\Magento\Framework\ObjectManagerInterface::class)
+            ->setMethods(['getInstance'])
+            ->getMockForAbstractClass();
+        $objectManagerMock->expects($this->any())->method('getInstance')->willReturnSelf();
+        $objectManagerMock->expects($this->any())
+            ->method('get')
+            ->will($this->returnValueMap($map));
+        $reflectionClass = new \ReflectionClass(\Magento\Framework\App\ObjectManager::class);
+        $reflectionProperty = $reflectionClass->getProperty('_instance');
+        $reflectionProperty->setAccessible(true);
+        $reflectionProperty->setValue($objectManagerMock);
+    }
+
+    /**
+     * Test receiving cache key info.
+     */
+    public function testGetCacheKeyInfo()
+    {
+        $expected = [
+                0 => 'BLOCK_TPL',
+                1 => 'default',
+                2 => null,
+                'base_url' => null,
+                'template' => null,
+                3 => 'USD',
+                4 => null,
+                5 => 'STORE_1_CAT_25_CUSTGROUP_0_color_53',
+            ];
+        $stateKey = 'STORE_1_CAT_25_CUSTGROUP_0_color_53';
+
+        $storeMock = $this->getMockBuilder(\Magento\Store\Api\Data\StoreInterface::class)->getMockForAbstractClass();
+        $storeMock->expects($this->any())->method('getCode')->willReturn('default');
+        $this->storeManagerMock->expects($this->any())->method('getStore')->willReturn($storeMock);
+        $currency = $this->getMockBuilder(\Magento\Directory\Model\Currency::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+        $this->priceCurrency->expects($this->once())->method('getCurrency')->willReturn($currency);
+        $currency->expects($this->once())->method('getCode')->willReturn('USD');
+        $layer = $this->createMock(\Magento\Catalog\Model\Layer::class);
+        $this->layerResolverMock->expects($this->once())->method('get')->willReturn($layer);
+        $layer->expects($this->once())->method('getStateKey')->willReturn($stateKey);
+
+        $this->assertEquals($this->configurable->getCacheKeyInfo(), $expected);
     }
 }

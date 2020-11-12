@@ -11,6 +11,7 @@ use Magento\Sales\Model\Order\Email\Container\Template;
 use Magento\Sales\Model\Order\Email\NotifySender;
 use Magento\Sales\Model\Order\Address\Renderer;
 use Magento\Framework\Event\ManagerInterface;
+use Magento\Framework\DataObject;
 
 /**
  * Class OrderCommentSender
@@ -60,6 +61,8 @@ class OrderCommentSender extends NotifySender
      */
     public function send(Order $order, $notify = true, $comment = '')
     {
+        $this->identityContainer->setStore($order->getStore());
+
         $transport = [
             'order' => $order,
             'comment' => $comment,
@@ -67,14 +70,22 @@ class OrderCommentSender extends NotifySender
             'store' => $order->getStore(),
             'formattedShippingAddress' => $this->getFormattedShippingAddress($order),
             'formattedBillingAddress' => $this->getFormattedBillingAddress($order),
+            'order_data' => [
+                'customer_name' => $order->getCustomerName(),
+                'frontend_status_label' => $order->getFrontendStatusLabel()
+            ]
         ];
+        $transportObject = new DataObject($transport);
 
+        /**
+         * Event argument `transport` is @deprecated. Use `transportObject` instead.
+         */
         $this->eventManager->dispatch(
             'email_order_comment_set_template_vars_before',
-            ['sender' => $this, 'transport' => $transport]
+            ['sender' => $this, 'transport' => $transportObject->getData(), 'transportObject' => $transportObject]
         );
 
-        $this->templateContainer->setTemplateVars($transport);
+        $this->templateContainer->setTemplateVars($transportObject->getData());
 
         return $this->checkAndSend($order, $notify);
     }

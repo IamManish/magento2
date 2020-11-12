@@ -1,11 +1,8 @@
 <?php
 /**
- *
  * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
-
-// @codingStandardsIgnoreFile
 
 namespace Magento\Catalog\Test\Unit\Model\Product\Gallery;
 
@@ -268,7 +265,7 @@ class GalleryManagementTest extends \PHPUnit\Framework\TestCase
 
     /**
      * @expectedException \Magento\Framework\Exception\NoSuchEntityException
-     * @expectedExceptionText Such image doesn't exist
+     * @expectedExceptionMessage Such image doesn't exist
      */
     public function testGetWithNonExistingImage()
     {

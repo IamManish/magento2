@@ -95,8 +95,8 @@ abstract class AbstractProduct extends \Magento\Rule\Model\Condition\AbstractCon
      * @param \Magento\Catalog\Model\ResourceModel\Product $productResource
      * @param \Magento\Eav\Model\ResourceModel\Entity\Attribute\Set\Collection $attrSetCollection
      * @param \Magento\Framework\Locale\FormatInterface $localeFormat
-     * @param ProductCategoryList|null $categoryList
      * @param array $data
+     * @param ProductCategoryList|null $categoryList
      *
      * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
@@ -241,7 +241,9 @@ abstract class AbstractProduct extends \Magento\Rule\Model\Condition\AbstractCon
                 } else {
                     $addEmptyOption = true;
                 }
-                $selectOptions = $attributeObject->getSource()->getAllOptions($addEmptyOption);
+                $selectOptions = $this->removeTagsFromLabel(
+                    $attributeObject->getSource()->getAllOptions($addEmptyOption)
+                );
             }
         }
 
@@ -514,6 +516,10 @@ abstract class AbstractProduct extends \Magento\Rule\Model\Condition\AbstractCon
             ) ? $this->_localeFormat->getNumber(
                 $arr['is_value_parsed']
             ) : false;
+        } elseif (!empty($arr['operator']) && $arr['operator'] == '()') {
+            if (isset($arr['value'])) {
+                $arr['value'] = preg_replace('/\s*,\s*/', ',', $arr['value']);
+            }
         }
 
         return parent::loadArray($arr);
@@ -605,6 +611,7 @@ abstract class AbstractProduct extends \Magento\Rule\Model\Condition\AbstractCon
                 )->__toString()
             );
         }
+
         return parent::getBindArgumentValue();
     }
 
@@ -695,6 +702,7 @@ abstract class AbstractProduct extends \Magento\Rule\Model\Condition\AbstractCon
 
     /**
      * Correct '==' and '!=' operators
+     *
      * Categories can't be equal because product is included categories selected by administrator and in their parents
      *
      * @return string
@@ -702,7 +710,7 @@ abstract class AbstractProduct extends \Magento\Rule\Model\Condition\AbstractCon
     public function getOperatorForValidate()
     {
         $operator = $this->getOperator();
-        if ($this->getInputType() == 'category') {
+        if ('category' === $this->getInputType()) {
             if ($operator == '==') {
                 $operator = '{}';
             } elseif ($operator == '!=') {
@@ -733,5 +741,22 @@ abstract class AbstractProduct extends \Magento\Rule\Model\Condition\AbstractCon
         $attribute = $this->getAttributeObject();
 
         return 'at_' . $attribute->getAttributeCode();
+    }
+
+    /**
+     * Remove html tags from attribute labels.
+     *
+     * @param array $selectOptions
+     * @return array
+     */
+    private function removeTagsFromLabel(array $selectOptions)
+    {
+        foreach ($selectOptions as &$option) {
+            if (isset($option['label'])) {
+                $option['label'] = strip_tags($option['label']);
+            }
+        }
+
+        return $selectOptions;
     }
 }

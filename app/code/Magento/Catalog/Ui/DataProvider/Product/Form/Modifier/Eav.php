@@ -17,11 +17,14 @@ use Magento\Catalog\Ui\DataProvider\CatalogEavValidationRules;
 use Magento\Eav\Api\Data\AttributeGroupInterface;
 use Magento\Eav\Api\Data\AttributeInterface;
 use Magento\Eav\Model\Config;
+use Magento\Eav\Model\Entity\Attribute\Source\SpecificSourceInterface;
 use Magento\Eav\Model\ResourceModel\Entity\Attribute\Group\CollectionFactory as GroupCollectionFactory;
 use Magento\Framework\Api\SearchCriteriaBuilder;
 use Magento\Framework\Api\SortOrderBuilder;
+use Magento\Framework\App\ObjectManager;
 use Magento\Framework\App\Request\DataPersistorInterface;
 use Magento\Framework\App\RequestInterface;
+use Magento\Framework\AuthorizationInterface;
 use Magento\Framework\Filter\Translit;
 use Magento\Framework\Locale\CurrencyInterface;
 use Magento\Framework\Stdlib\ArrayManager;
@@ -31,6 +34,8 @@ use Magento\Ui\Component\Form\Field;
 use Magento\Ui\Component\Form\Fieldset;
 use Magento\Ui\DataProvider\Mapper\FormElement as FormElementMapper;
 use Magento\Ui\DataProvider\Mapper\MetaProperties as MetaPropertiesMapper;
+use Magento\Eav\Model\ResourceModel\Entity\Attribute\CollectionFactory as AttributeCollectionFactory;
+use \Magento\Catalog\Model\Product\Type as ProductType;
 
 /**
  * Class Eav
@@ -39,6 +44,7 @@ use Magento\Ui\DataProvider\Mapper\MetaProperties as MetaPropertiesMapper;
  *
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  * @SuppressWarnings(PHPMD.TooManyFields)
+ * @SuppressWarnings(PHPMD.ExcessiveClassComplexity)
  * @since 101.0.0
  */
 class Eav extends AbstractModifier
@@ -188,6 +194,38 @@ class Eav extends AbstractModifier
     private $localeCurrency;
 
     /**
+     * internal cache for attribute models
+     * @var array
+     */
+    private $attributesCache = [];
+
+    /**
+     * @var AttributeCollectionFactory
+     */
+    private $attributeCollectionFactory;
+
+    /**
+     * @var AuthorizationInterface
+     */
+    private $authorization;
+
+    /**
+     * Product design attribute codes.
+     *
+     * @var array
+     */
+    private $designAttributeCodes = [
+        'custom_design',
+        'page_layout',
+        'options_container',
+        'custom_layout_update',
+        'custom_design_from',
+        'custom_design_to',
+        'custom_layout',
+        'custom_layout_update_file'
+    ];
+
+    /**
      * @param LocatorInterface $locator
      * @param CatalogEavValidationRules $catalogEavValidationRules
      * @param Config $eavConfig
@@ -207,6 +245,8 @@ class Eav extends AbstractModifier
      * @param DataPersistorInterface $dataPersistor
      * @param array $attributesToDisable
      * @param array $attributesToEliminate
+     * @param AttributeCollectionFactory $attributeCollectionFactory
+     * @param AuthorizationInterface|null $authorization
      * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
@@ -228,7 +268,9 @@ class Eav extends AbstractModifier
         ScopeOverriddenValue $scopeOverriddenValue,
         DataPersistorInterface $dataPersistor,
         $attributesToDisable = [],
-        $attributesToEliminate = []
+        $attributesToEliminate = [],
+        AttributeCollectionFactory $attributeCollectionFactory = null,
+        AuthorizationInterface $authorization = null
     ) {
         $this->locator = $locator;
         $this->catalogEavValidationRules = $catalogEavValidationRules;
@@ -249,6 +291,9 @@ class Eav extends AbstractModifier
         $this->dataPersistor = $dataPersistor;
         $this->attributesToDisable = $attributesToDisable;
         $this->attributesToEliminate = $attributesToEliminate;
+        $this->attributeCollectionFactory = $attributeCollectionFactory
+            ?: ObjectManager::getInstance()->get(AttributeCollectionFactory::class);
+        $this->authorization = $authorization ?? ObjectManager::getInstance()->get(AuthorizationInterface::class);
     }
 
     /**
@@ -265,7 +310,7 @@ class Eav extends AbstractModifier
             if ($attributes) {
                 $meta[$groupCode]['children'] = $this->getAttributesMeta($attributes, $groupCode);
                 $meta[$groupCode]['arguments']['data']['config']['componentType'] = Fieldset::NAME;
-                $meta[$groupCode]['arguments']['data']['config']['label'] = __('%1', $group->getAttributeGroupName());
+                $meta[$groupCode]['arguments']['data']['config']['label'] = __($group->getAttributeGroupName());
                 $meta[$groupCode]['arguments']['data']['config']['collapsible'] = true;
                 $meta[$groupCode]['arguments']['data']['config']['dataScope'] = self::DATA_SCOPE_PRODUCT;
                 $meta[$groupCode]['arguments']['data']['config']['sortOrder'] =
@@ -381,7 +426,7 @@ class Eav extends AbstractModifier
 
             foreach ($attributes as $attribute) {
                 if (null !== ($attributeValue = $this->setupAttributeData($attribute))) {
-                    if ($attribute->getFrontendInput() === 'price' && is_scalar($attributeValue)) {
+                    if ($this->isPriceAttribute($attribute, $attributeValue)) {
                         $attributeValue = $this->formatPrice($attributeValue);
                     }
                     $data[$productId][self::DATA_SOURCE_DEFAULT][$attribute->getAttributeCode()] = $attributeValue;
@@ -390,6 +435,32 @@ class Eav extends AbstractModifier
         }
 
         return $data;
+    }
+
+    /**
+     * Obtain if given attribute is a price
+     *
+     * @param \Magento\Catalog\Api\Data\ProductAttributeInterface $attribute
+     * @param string|integer $attributeValue
+     * @return bool
+     */
+    private function isPriceAttribute(ProductAttributeInterface $attribute, $attributeValue)
+    {
+        return $attribute->getFrontendInput() === 'price'
+            && is_scalar($attributeValue)
+            && !$this->isBundleSpecialPrice($attribute);
+    }
+
+    /**
+     * Obtain if current product is bundle and given attribute is special_price
+     *
+     * @param \Magento\Catalog\Api\Data\ProductAttributeInterface $attribute
+     * @return bool
+     */
+    private function isBundleSpecialPrice(ProductAttributeInterface $attribute)
+    {
+        return $this->locator->getProduct()->getTypeId() === ProductType::TYPE_BUNDLE
+            && $attribute->getAttributeCode() === ProductAttributeInterface::CODE_SPECIAL_PRICE;
     }
 
     /**
@@ -485,39 +556,59 @@ class Eav extends AbstractModifier
     private function getAttributes()
     {
         if (!$this->attributes) {
-            foreach ($this->getGroups() as $group) {
-                $this->attributes[$this->calculateGroupCode($group)] = $this->loadAttributes($group);
-            }
+            $this->attributes = $this->loadAttributesForGroups($this->getGroups());
         }
 
         return $this->attributes;
     }
 
     /**
-     * Loading product attributes from group
+     * Loads attributes for specified groups at once
      *
-     * @param AttributeGroupInterface $group
-     * @return ProductAttributeInterface[]
+     * @param AttributeGroupInterface[] ...$groups
+     * @return @return ProductAttributeInterface[]
      */
-    private function loadAttributes(AttributeGroupInterface $group)
+    private function loadAttributesForGroups(array $groups)
     {
         $attributes = [];
+        $groupIds = [];
+
+        foreach ($groups as $group) {
+            $groupIds[$group->getAttributeGroupId()] = $this->calculateGroupCode($group);
+            $attributes[$this->calculateGroupCode($group)] = [];
+        }
+
+        $collection = $this->attributeCollectionFactory->create();
+        $collection->setAttributeGroupFilter(array_keys($groupIds));
+
+        $mapAttributeToGroup = [];
+
+        foreach ($collection->getItems() as $attribute) {
+            $mapAttributeToGroup[$attribute->getAttributeId()] = $attribute->getAttributeGroupId();
+        }
+
         $sortOrder = $this->sortOrderBuilder
             ->setField('sort_order')
             ->setAscendingDirection()
             ->create();
+
         $searchCriteria = $this->searchCriteriaBuilder
-            ->addFilter(AttributeGroupInterface::GROUP_ID, $group->getAttributeGroupId())
+            ->addFilter(AttributeGroupInterface::GROUP_ID, array_keys($groupIds), 'in')
             ->addFilter(ProductAttributeInterface::IS_VISIBLE, 1)
             ->addSortOrder($sortOrder)
             ->create();
+
         $groupAttributes = $this->attributeRepository->getList($searchCriteria)->getItems();
+
         $productType = $this->getProductType();
+
         foreach ($groupAttributes as $attribute) {
             $applyTo = $attribute->getApplyTo();
             $isRelated = !$applyTo || in_array($productType, $applyTo);
             if ($isRelated) {
-                $attributes[] = $attribute;
+                $attributeGroupId = $mapAttributeToGroup[$attribute->getAttributeId()];
+                $attributeGroupCode = $groupIds[$attributeGroupId];
+                $attributes[$attributeGroupCode][] = $attribute;
             }
         }
 
@@ -553,7 +644,7 @@ class Eav extends AbstractModifier
      */
     private function isProductExists()
     {
-        return (bool) $this->locator->getProduct()->getId();
+        return (bool)$this->locator->getProduct()->getId();
     }
 
     /**
@@ -572,7 +663,7 @@ class Eav extends AbstractModifier
     public function setupAttributeMeta(ProductAttributeInterface $attribute, $groupCode, $sortOrder)
     {
         $configPath = ltrim(static::META_CONFIG_PATH, ArrayManager::DEFAULT_PATH_DELIMITER);
-
+        $attributeCode = $attribute->getAttributeCode();
         $meta = $this->arrayManager->set($configPath, [], [
             'dataType' => $attribute->getFrontendInput(),
             'formElement' => $this->getFormElementsMapValue($attribute->getFrontendInput()),
@@ -581,18 +672,29 @@ class Eav extends AbstractModifier
             'notice' => $attribute->getNote(),
             'default' => (!$this->isProductExists()) ? $attribute->getDefaultValue() : null,
             'label' => $attribute->getDefaultFrontendLabel(),
-            'code' => $attribute->getAttributeCode(),
+            'code' => $attributeCode,
             'source' => $groupCode,
             'scopeLabel' => $this->getScopeLabel($attribute),
             'globalScope' => $this->isScopeGlobal($attribute),
             'sortOrder' => $sortOrder * self::SORT_ORDER_MULTIPLIER,
+            '__disableTmpl' => ['label' => true, 'code' => true]
         ]);
+        $product = $this->locator->getProduct();
 
         // TODO: Refactor to $attribute->getOptions() when MAGETWO-48289 is done
         $attributeModel = $this->getAttributeModel($attribute);
         if ($attributeModel->usesSource()) {
+            $source = $attributeModel->getSource();
+            if ($source instanceof SpecificSourceInterface) {
+                $options = $source->getOptionsFor($product);
+            } else {
+                $options = $source->getAllOptions(true, true);
+            }
+            foreach ($options as &$option) {
+                $option['__disableTmpl'] = true;
+            }
             $meta = $this->arrayManager->merge($configPath, $meta, [
-                'options' => $attributeModel->getSource()->getAllOptions(),
+                'options' => $this->convertOptionsValueToString($options),
             ]);
         }
 
@@ -610,7 +712,7 @@ class Eav extends AbstractModifier
             ]);
         }
 
-        if (in_array($attribute->getAttributeCode(), $this->attributesToDisable)) {
+        if (in_array($attributeCode, $this->attributesToDisable) || $product->isLockedAttribute($attributeCode)) {
             $meta = $this->arrayManager->merge($configPath, $meta, [
                 'disabled' => true,
             ]);
@@ -642,7 +744,57 @@ class Eav extends AbstractModifier
                 break;
         }
 
+        $meta = $this->disableInaccessibleAttribute($attribute, $configPath, $meta);
+
         return $meta;
+    }
+
+    /**
+     * Disable inaccessible attributes.
+     *
+     * @param ProductAttributeInterface $attribute
+     * @param string $configPath
+     * @param array $meta
+     * @return array Updated meta.
+     */
+    private function disableInaccessibleAttribute(
+        ProductAttributeInterface $attribute,
+        string $configPath,
+        array $meta
+    ): array {
+        if (in_array($attribute->getAttributeCode(), $this->designAttributeCodes, true)) {
+            //Checking access to design configurations
+            if (!$this->authorization->isAllowed('Magento_Catalog::edit_product_design')) {
+                return $this->arrayManager->merge(
+                    $configPath,
+                    $meta,
+                    [
+                        'disabled' => true,
+                        'validation' => ['required' => false],
+                        'required' => false,
+                        'serviceDisabled' => true,
+                    ]
+                );
+            }
+        }
+
+        return $meta;
+    }
+
+    /**
+     * Convert options value to string
+     *
+     * @param array $options
+     * @return array
+     */
+    private function convertOptionsValueToString(array $options): array
+    {
+        array_walk($options, function (&$value) {
+            if (isset($value['value']) && is_scalar($value['value'])) {
+                $value['value'] = (string)$value['value'];
+            }
+        });
+        return $options;
     }
 
     /**
@@ -687,6 +839,7 @@ class Eav extends AbstractModifier
                 'breakLine' => false,
                 'label' => $attribute->getDefaultFrontendLabel(),
                 'required' => $attribute->getIsRequired(),
+                '__disableTmpl' => ['label' => true]
             ]
         );
 
@@ -800,7 +953,7 @@ class Eav extends AbstractModifier
     {
         $valueMap = $this->formElementMapper->getMappings();
 
-        return isset($valueMap[$value]) ? $valueMap[$value] : $value;
+        return $valueMap[$value] ?? $value;
     }
 
     /**
@@ -854,6 +1007,9 @@ class Eav extends AbstractModifier
         $attributeCode = $attribute->getAttributeCode();
         /** @var Product $product */
         $product = $this->locator->getProduct();
+        if ($product->isLockedAttribute($attributeCode)) {
+            return false;
+        }
 
         if (isset($this->canDisplayUseDefault[$attributeCode])) {
             return $this->canDisplayUseDefault[$attributeCode];
@@ -888,7 +1044,13 @@ class Eav extends AbstractModifier
      */
     private function getAttributeModel($attribute)
     {
-        return $this->eavAttributeFactory->create()->load($attribute->getAttributeId());
+        $attributeId = $attribute->getAttributeId();
+
+        if (!array_key_exists($attributeId, $this->attributesCache)) {
+            $this->attributesCache[$attributeId] = $this->eavAttributeFactory->create()->load($attributeId);
+        }
+
+        return $this->attributesCache[$attributeId];
     }
 
     /**

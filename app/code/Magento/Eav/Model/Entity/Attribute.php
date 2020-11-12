@@ -7,6 +7,7 @@ namespace Magento\Eav\Model\Entity;
 
 use Magento\Framework\Api\AttributeValueFactory;
 use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\Stdlib\DateTime;
 use Magento\Framework\Stdlib\DateTime\DateTimeFormatterInterface;
 
 /**
@@ -237,22 +238,6 @@ class Attribute extends \Magento\Eav\Model\Entity\Attribute\AbstractAttribute im
             );
         }
 
-        /**
-         * Check for maximum attribute_code length
-         */
-        if (isset(
-            $this->_data['attribute_code']
-        ) && !\Zend_Validate::is(
-            $this->_data['attribute_code'],
-            'StringLength',
-            ['max' => self::ATTRIBUTE_CODE_MAX_LENGTH]
-        )
-        ) {
-            throw new LocalizedException(
-                __('An attribute code must not be more than %1 characters.', self::ATTRIBUTE_CODE_MAX_LENGTH)
-            );
-        }
-
         $defaultValue = $this->getDefaultValue();
         $hasDefaultValue = (string)$defaultValue != '';
 
@@ -276,15 +261,19 @@ class Attribute extends \Magento\Eav\Model\Entity\Attribute\AbstractAttribute im
 
             // save default date value as timestamp
             if ($hasDefaultValue) {
-                $format = $this->_localeDate->getDateFormat(
-                    \IntlDateFormatter::SHORT
-                );
                 try {
-                    $defaultValue = $this->dateTimeFormatter->formatObject(new \DateTime($defaultValue), $format);
-                    $this->setDefaultValue($defaultValue);
+                    $locale = $this->_localeResolver->getLocale();
+                    $defaultValue = $this->_localeDate->date($defaultValue, $locale, false, false);
+                    $this->setDefaultValue($defaultValue->format(DateTime::DATETIME_PHP_FORMAT));
                 } catch (\Exception $e) {
                     throw new LocalizedException(__('Invalid default date'));
                 }
+            }
+        }
+
+        if ($this->getFrontendInput() == 'media_image') {
+            if (!$this->getFrontendModel()) {
+                $this->setFrontendModel(\Magento\Catalog\Model\Product\Attribute\Frontend\Image::class);
             }
         }
 

@@ -5,6 +5,7 @@
  */
 namespace Magento\Swatches\Test\Unit\Block\Product\Renderer;
 
+use Magento\Catalog\Model\Product\Attribute\Source\Status;
 use Magento\Swatches\Block\Product\Renderer\Configurable;
 use Magento\Swatches\Model\Swatch;
 
@@ -150,11 +151,13 @@ class ConfigurableTest extends \PHPUnit\Framework\TestCase
     private function prepareGetJsonSwatchConfig()
     {
         $product1 = $this->createMock(\Magento\Catalog\Model\Product::class);
-        $product1->expects($this->atLeastOnce())->method('isSaleable')->willReturn(true);
+        $product1->expects($this->any())->method('isSaleable')->willReturn(true);
+        $product1->expects($this->atLeastOnce())->method('getStatus')->willReturn(Status::STATUS_ENABLED);
         $product1->expects($this->atLeastOnce())->method('getData')->with('code')->willReturn(1);
 
         $product2 = $this->createMock(\Magento\Catalog\Model\Product::class);
-        $product2->expects($this->atLeastOnce())->method('isSaleable')->willReturn(true);
+        $product2->expects($this->any())->method('isSaleable')->willReturn(true);
+        $product2->expects($this->atLeastOnce())->method('getStatus')->willReturn(Status::STATUS_ENABLED);
         $product2->expects($this->atLeastOnce())->method('getData')->with('code')->willReturn(3);
 
         $simpleProducts = [$product1, $product2];
@@ -318,5 +321,58 @@ class ConfigurableTest extends \PHPUnit\Framework\TestCase
             ->willReturn($url);
 
         $this->assertEquals($url, $this->configurable->getMediaCallback());
+    }
+
+    /**
+     * @param array $imageConfig
+     * @param array $sizeConfig
+     * @param string $encodedSizeConfig
+     * @return void
+     * @dataProvider getJsonSwatchSizeConfigDataProvider
+     */
+    public function testGetJsonSwatchSizeConfig(array $imageConfig, array $sizeConfig, string $encodedSizeConfig)
+    {
+        $this->swatchMediaHelper->expects($this->once())
+            ->method('getImageConfig')
+            ->willReturn($imageConfig);
+        $this->jsonEncoder->expects($this->once())
+            ->method('encode')
+            ->with($sizeConfig)
+            ->willReturn($encodedSizeConfig);
+
+        $this->assertEquals($encodedSizeConfig, $this->configurable->getJsonSwatchSizeConfig());
+    }
+
+    /**
+     * @return array
+     */
+    public function getJsonSwatchSizeConfigDataProvider(): array
+    {
+        return [
+            [
+                'imageConfig' => [
+                    Swatch::SWATCH_IMAGE_NAME => [
+                        'width' => 30,
+                        'height' => 30,
+                    ],
+                    Swatch::SWATCH_THUMBNAIL_NAME => [
+                        'width' => 50,
+                        'height' => 50,
+                    ],
+                ],
+                'sizeConfig' => [
+                    Configurable::SWATCH_IMAGE_NAME => [
+                        'width' => 30,
+                        'height' => 30,
+                    ],
+                    Configurable::SWATCH_THUMBNAIL_NAME => [
+                        'width' => 50,
+                        'height' => 50,
+                    ],
+                ],
+                'encodedSizeConfig' =>
+                    '{"swatchImage":{"width":30,"height":30},"swatchThumb":{"height":50,"width":50}}',
+            ],
+        ];
     }
 }

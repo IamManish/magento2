@@ -5,6 +5,11 @@
  */
 namespace Magento\Catalog\Model;
 
+use Magento\Catalog\Model\Category\Attribute\LayoutUpdateManager as CategoryLayoutManager;
+use Magento\Catalog\Model\Product\Attribute\LayoutUpdateManager as ProductLayoutManager;
+use Magento\Framework\App\ObjectManager;
+use \Magento\Framework\TranslateInterface;
+
 /**
  * Catalog Custom Category design Model
  *
@@ -12,6 +17,7 @@ namespace Magento\Catalog\Model;
  *
  * @author     Magento Core Team <core@magentocommerce.com>
  * @since 100.0.2
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
 class Design extends \Magento\Framework\Model\AbstractModel
 {
@@ -32,6 +38,21 @@ class Design extends \Magento\Framework\Model\AbstractModel
     protected $_localeDate;
 
     /**
+     * @var TranslateInterface
+     */
+    private $translator;
+
+    /**
+     * @var CategoryLayoutManager
+     */
+    private $categoryLayoutUpdates;
+
+    /**
+     * @var ProductLayoutManager
+     */
+    private $productLayoutUpdates;
+
+    /**
      * @param \Magento\Framework\Model\Context $context
      * @param \Magento\Framework\Registry $registry
      * @param \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate
@@ -39,6 +60,10 @@ class Design extends \Magento\Framework\Model\AbstractModel
      * @param \Magento\Framework\Model\ResourceModel\AbstractResource $resource
      * @param \Magento\Framework\Data\Collection\AbstractDb $resourceCollection
      * @param array $data
+     * @param TranslateInterface|null $translator
+     * @param CategoryLayoutManager|null $categoryLayoutManager
+     * @param ProductLayoutManager|null $productLayoutManager
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
         \Magento\Framework\Model\Context $context,
@@ -47,10 +72,18 @@ class Design extends \Magento\Framework\Model\AbstractModel
         \Magento\Framework\View\DesignInterface $design,
         \Magento\Framework\Model\ResourceModel\AbstractResource $resource = null,
         \Magento\Framework\Data\Collection\AbstractDb $resourceCollection = null,
-        array $data = []
+        array $data = [],
+        TranslateInterface $translator = null,
+        CategoryLayoutManager $categoryLayoutManager = null,
+        ProductLayoutManager $productLayoutManager = null
     ) {
         $this->_localeDate = $localeDate;
         $this->_design = $design;
+        $this->translator = $translator ?? ObjectManager::getInstance()->get(TranslateInterface::class);
+        $this->categoryLayoutUpdates = $categoryLayoutManager
+            ?? ObjectManager::getInstance()->get(CategoryLayoutManager::class);
+        $this->productLayoutUpdates = $productLayoutManager
+            ?? ObjectManager::getInstance()->get(ProductLayoutManager::class);
         parent::__construct($context, $registry, $resource, $resourceCollection, $data);
     }
 
@@ -63,6 +96,7 @@ class Design extends \Magento\Framework\Model\AbstractModel
     public function applyCustomDesign($design)
     {
         $this->_design->setDesignTheme($design);
+        $this->translator->loadData(null, true);
         return $this;
     }
 
@@ -128,6 +162,11 @@ class Design extends \Magento\Framework\Model\AbstractModel
             )->setLayoutUpdates(
                 (array)$object->getCustomLayoutUpdate()
             );
+            if ($object instanceof \Magento\Catalog\Model\Category) {
+                $this->categoryLayoutUpdates->extractCustomSettings($object, $settings);
+            } elseif ($object instanceof \Magento\Catalog\Model\Product) {
+                $this->productLayoutUpdates->extractCustomSettings($object, $settings);
+            }
         }
         return $settings;
     }

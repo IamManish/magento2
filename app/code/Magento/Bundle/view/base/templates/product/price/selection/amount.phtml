@@ -4,10 +4,9 @@
  * See COPYING.txt for license details.
  */
 
-// @codingStandardsIgnoreFile
-
+// phpcs:disable PSR2.Files.ClosingTag
 ?>
 
 <?php /** @var \Magento\Framework\Pricing\Render\Amount $block */ ?>
 
-<?= /* @escapeNotVerified */ $block->formatCurrency($block->getDisplayValue(), (bool) $block->getIncludeContainer()) ?>
+<?= /* @noEscape */ $block->formatCurrency($block->getDisplayValue(), (bool) $block->getIncludeContainer()); ?>

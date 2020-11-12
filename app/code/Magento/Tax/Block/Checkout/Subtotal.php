@@ -15,7 +15,7 @@ class Subtotal extends \Magento\Checkout\Block\Total\DefaultTotal
      *
      * @var string
      */
-    protected $_template = 'checkout/subtotal.phtml';
+    protected $_template = 'Magento_Tax::checkout/subtotal.phtml';
 
     /**
      * @var \Magento\Tax\Model\Config
@@ -46,6 +46,8 @@ class Subtotal extends \Magento\Checkout\Block\Total\DefaultTotal
     }
 
     /**
+     * Get display including and excluding tax config
+     *
      * @return bool
      */
     public function displayBoth()

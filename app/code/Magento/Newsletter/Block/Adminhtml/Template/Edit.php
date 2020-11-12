@@ -4,8 +4,6 @@
  * See COPYING.txt for license details.
  */
 
-// @codingStandardsIgnoreFile
-
 /**
  * Newsletter Template Edit Block
  *
@@ -69,12 +67,6 @@ class Edit extends Widget
      */
     protected function _prepareLayout()
     {
-        // Load Wysiwyg on demand and Prepare layout
-//        $block = $this->getLayout()->getBlock('head');
-//        if ($this->_wysiwygConfig->isEnabled() && $block) {
-//            $block->setCanLoadTinyMce(true);
-//        }
-
         $this->getToolbar()->addChild(
             'back_button',
             \Magento\Backend\Block\Widget\Button::class,
@@ -213,12 +205,12 @@ class Edit extends Widget
     public function getForm()
     {
         return $this->getLayout()->createBlock(
-             \Magento\Newsletter\Block\Adminhtml\Template\Edit\Form::class
+            \Magento\Newsletter\Block\Adminhtml\Template\Edit\Form::class
         )->toHtml();
     }
 
     /**
-     * Return return template name for JS
+     * Return template name for JS
      *
      * @return string
      */
@@ -239,6 +231,8 @@ class Edit extends Widget
 
     /**
      * Return preview action url for form
+     *
+     * @SuppressWarnings(PHPMD.RequestAwareBlockMethod)
      *
      * @return string
      */
@@ -273,6 +267,8 @@ class Edit extends Widget
     /**
      * Return delete url for customer group
      *
+     * @SuppressWarnings(PHPMD.RequestAwareBlockMethod)
+     *
      * @return string
      */
     public function getDeleteUrl()
@@ -282,6 +278,8 @@ class Edit extends Widget
 
     /**
      * Retrieve Save As Flag
+     *
+     * @SuppressWarnings(PHPMD.RequestAwareBlockMethod)
      *
      * @return int
      */

@@ -479,9 +479,9 @@ Strong,Strong
 "The title that goes before name (Mr., Mrs., etc.)","The title that goes before name (Mr., Mrs., etc.)"
 "Prefix Dropdown Options","Prefix Dropdown Options"
 "
-                        Semicolon (;) separated values.<br/>Put semicolon in the beginning for empty first option.<br/>Leave empty for open text field.
+                        Semicolon (;) separated values.<br/>Leave empty for open text field.
                     ","
-                        Semicolon (;) separated values.<br/>Put semicolon in the beginning for empty first option.<br/>Leave empty for open text field.
+                        Semicolon (;) separated values.<br/>Leave empty for open text field.
                     "
 "Show Middle Name (initial)","Show Middle Name (initial)"
 "Always optional.","Always optional."
@@ -500,6 +500,7 @@ Strong,Strong
 "Address Templates","Address Templates"
 "Online Customers Options","Online Customers Options"
 "Online Minutes Interval","Online Minutes Interval"
+"Only 'b', 'br', 'em', 'i', 'li', 'ol', 'p', 'strong', 'sub', 'sup', 'ul' tags are allowed","Only 'b', 'br', 'em', 'i', 'li', 'ol', 'p', 'strong', 'sub', 'sup', 'ul' tags are allowed"
 "Leave empty for default (15 minutes).","Leave empty for default (15 minutes)."
 "Customer Notification","Customer Notification"
 "Customer Grid","Customer Grid"
@@ -531,8 +532,6 @@ Type,Type
 "Send Welcome Email From","Send Welcome Email From"
 "Are you sure you want to delete this item?","Are you sure you want to delete this item?"
 Addresses,Addresses
-"Account Dashboard","Account Dashboard"
 "Edit Account Information","Edit Account Information"
 "Password forgotten","Password forgotten"
-"My Dashboard","My Dashboard"
 "You are signed out","You are signed out"

@@ -153,13 +153,9 @@ class SaveTest extends \PHPUnit\Framework\TestCase
             ->method('create')
             ->willReturn($page);
 
-        $page->expects($this->any())
-            ->method('load')
-            ->willReturnSelf();
-        $page->expects($this->any())
-            ->method('getId')
-            ->willReturn(true);
+        $this->pageRepository->expects($this->once())->method('getById')->with($this->pageId)->willReturn($page);
         $page->expects($this->once())->method('setData');
+        $page->method('getId')->willReturn($this->pageId);
         $this->pageRepository->expects($this->once())->method('save')->with($page);
 
         $this->dataPersistorMock->expects($this->any())
@@ -178,6 +174,36 @@ class SaveTest extends \PHPUnit\Framework\TestCase
     public function testSaveActionWithoutData()
     {
         $this->requestMock->expects($this->any())->method('getPostValue')->willReturn(false);
+        $this->resultRedirect->expects($this->atLeastOnce())->method('setPath')->with('*/*/') ->willReturnSelf();
+        $this->assertSame($this->resultRedirect, $this->saveController->execute());
+    }
+
+    public function testSaveActionNoId()
+    {
+        $this->requestMock->expects($this->any())->method('getPostValue')->willReturn(['page_id' => 1]);
+        $this->requestMock->expects($this->atLeastOnce())
+            ->method('getParam')
+            ->willReturnMap(
+                [
+                    ['page_id', null, 1],
+                    ['back', null, false],
+                ]
+            );
+
+        $page = $this->getMockBuilder(\Magento\Cms\Model\Page::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+
+        $this->pageFactory->expects($this->atLeastOnce())
+            ->method('create')
+            ->willReturn($page);
+        $this->pageRepository->expects($this->once())
+            ->method('getById')
+            ->with($this->pageId)
+            ->willThrowException(new \Magento\Framework\Exception\NoSuchEntityException(__('Error message')));
+        $this->messageManagerMock->expects($this->once())
+            ->method('addErrorMessage')
+            ->with(__('This page no longer exists.'));
         $this->resultRedirect->expects($this->atLeastOnce())->method('setPath')->with('*/*/') ->willReturnSelf();
         $this->assertSame($this->resultRedirect, $this->saveController->execute());
     }
@@ -204,12 +230,7 @@ class SaveTest extends \PHPUnit\Framework\TestCase
             ->method('create')
             ->willReturn($page);
 
-        $page->expects($this->any())
-            ->method('load')
-            ->willReturnSelf();
-        $page->expects($this->any())
-            ->method('getId')
-            ->willReturn(true);
+        $this->pageRepository->expects($this->once())->method('getById')->with($this->pageId)->willReturn($page);
         $page->expects($this->once())->method('setData');
         $this->pageRepository->expects($this->once())->method('save')->with($page);
 
@@ -247,16 +268,12 @@ class SaveTest extends \PHPUnit\Framework\TestCase
         $page = $this->getMockBuilder(\Magento\Cms\Model\Page::class)
             ->disableOriginalConstructor()
             ->getMock();
+        $page->method('getId')->willReturn(1);
         $this->pageFactory->expects($this->atLeastOnce())
             ->method('create')
             ->willReturn($page);
 
-        $page->expects($this->any())
-            ->method('load')
-            ->willReturnSelf();
-        $page->expects($this->any())
-            ->method('getId')
-            ->willReturn(true);
+        $this->pageRepository->expects($this->once())->method('getById')->with($this->pageId)->willReturn($page);
         $page->expects($this->once())->method('setData');
         $this->pageRepository->expects($this->once())->method('save')->with($page)
             ->willThrowException(new \Exception('Error message.'));
@@ -268,7 +285,14 @@ class SaveTest extends \PHPUnit\Framework\TestCase
 
         $this->dataPersistorMock->expects($this->any())
             ->method('set')
-            ->with('cms_page', ['page_id' => $this->pageId]);
+            ->with(
+                'cms_page',
+                [
+                    'page_id' => $this->pageId,
+                    'layout_update_xml' => null,
+                    'custom_layout_update_xml' => null
+                ]
+            );
 
         $this->resultRedirect->expects($this->atLeastOnce())
             ->method('setPath')

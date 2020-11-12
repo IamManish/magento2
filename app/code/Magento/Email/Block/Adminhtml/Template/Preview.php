@@ -4,14 +4,11 @@
  * See COPYING.txt for license details.
  */
 
-/**
- * Adminhtml system template preview block
- *
- * @author     Magento Core Team <core@magentocommerce.com>
- */
 namespace Magento\Email\Block\Adminhtml\Template;
 
 /**
+ * Email template preview block.
+ *
  * @api
  * @since 100.0.2
  */
@@ -53,6 +50,8 @@ class Preview extends \Magento\Backend\Block\Widget
      * Prepare html output
      *
      * @return string
+     * @SuppressWarnings(PHPMD.RequestAwareBlockMethod)
+     * @throws \Exception
      */
     protected function _toHtml()
     {
@@ -66,6 +65,8 @@ class Preview extends \Magento\Backend\Block\Widget
             $template->setTemplateType($this->getRequest()->getParam('type'));
             $template->setTemplateText($this->getRequest()->getParam('text'));
             $template->setTemplateStyles($this->getRequest()->getParam('styles'));
+            // Emulate DB-loaded template to invoke strict mode
+            $template->setTemplateId(123);
         }
 
         $template->setTemplateText($this->_maliciousCode->filter($template->getTemplateText()));
@@ -80,7 +81,7 @@ class Preview extends \Magento\Backend\Block\Widget
         $template->revertDesign();
 
         if ($template->isPlain()) {
-            $templateProcessed = "<pre>" . htmlspecialchars($templateProcessed) . "</pre>";
+            $templateProcessed = "<pre>" . $this->escapeHtml($templateProcessed) . "</pre>";
         }
 
         \Magento\Framework\Profiler::stop($this->profilerName);

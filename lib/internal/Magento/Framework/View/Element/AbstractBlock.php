@@ -679,10 +679,13 @@ abstract class AbstractBlock extends \Magento\Framework\DataObject implements Bl
                 'html' => $html,
             ]
         );
-        $this->_eventManager->dispatch('view_block_abstract_to_html_after', [
-            'block' => $this,
-            'transport' => $transportObject
-        ]);
+        $this->_eventManager->dispatch(
+            'view_block_abstract_to_html_after',
+            [
+                'block' => $this,
+                'transport' => $transportObject
+            ]
+        );
         $html = $transportObject->getHtml();
 
         return $html;
@@ -725,7 +728,7 @@ abstract class AbstractBlock extends \Magento\Framework\DataObject implements Bl
      */
     public function getUiId($arg1 = null, $arg2 = null, $arg3 = null, $arg4 = null, $arg5 = null)
     {
-        return ' data-ui-id="' . $this->getJsId($arg1, $arg2, $arg3, $arg4, $arg5) . '" ';
+        return ' data-ui-id="' . $this->escapeHtmlAttr($this->getJsId($arg1, $arg2, $arg3, $arg4, $arg5)) . '" ';
     }
 
     /**
@@ -952,7 +955,7 @@ abstract class AbstractBlock extends \Magento\Framework\DataObject implements Bl
      */
     public function escapeUrl($string)
     {
-        return $this->_escaper->escapeUrl($string);
+        return $this->_escaper->escapeUrl((string)$string);
     }
 
     /**
@@ -972,8 +975,8 @@ abstract class AbstractBlock extends \Magento\Framework\DataObject implements Bl
      *
      * Use $addSlashes = false for escaping js that inside html attribute (onClick, onSubmit etc)
      *
-     * @param  string $data
-     * @param  bool $addSlashes
+     * @param string $data
+     * @param bool $addSlashes
      * @return string
      * @deprecated 100.2.0
      */
@@ -1064,17 +1067,13 @@ abstract class AbstractBlock extends \Magento\Framework\DataObject implements Bl
     /**
      * Get block cache life time
      *
-     * @return int|bool|null
+     * @return int|null
      */
     protected function getCacheLifetime()
     {
-        if (!$this->hasData('cache_lifetime')) {
-            return null;
-        }
-
         $cacheLifetime = $this->getData('cache_lifetime');
         if (false === $cacheLifetime || null === $cacheLifetime) {
-            return $cacheLifetime;
+            return null;
         }
 
         return (int)$cacheLifetime;
@@ -1156,7 +1155,8 @@ abstract class AbstractBlock extends \Magento\Framework\DataObject implements Bl
 
     /**
      * Determine if the block scope is private or public.
-     * Returns true if scope is private, false otherwise
+     *
+     * Returns true if scope is private, false otherwise.
      *
      * @return bool
      */

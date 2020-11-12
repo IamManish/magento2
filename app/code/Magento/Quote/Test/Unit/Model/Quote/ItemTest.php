@@ -4,8 +4,6 @@
  * See COPYING.txt for license details.
  */
 
-// @codingStandardsIgnoreFile
-
 namespace Magento\Quote\Test\Unit\Model\Quote;
 
 /**
@@ -112,7 +110,10 @@ class ItemTest extends \PHPUnit\Framework\TestCase
 
         $this->compareHelper = $this->createMock(\Magento\Quote\Model\Quote\Item\Compare::class);
 
-        $this->stockItemMock = $this->createPartialMock(\Magento\CatalogInventory\Model\Stock\Item::class, ['getIsQtyDecimal', '__wakeup']);
+        $this->stockItemMock = $this->createPartialMock(
+            \Magento\CatalogInventory\Model\Stock\Item::class,
+            ['getIsQtyDecimal', '__wakeup']
+        );
 
         $this->serializer = $this->getMockBuilder(\Magento\Framework\Serialize\Serializer\Json::class)
             ->setMethods(['unserialize'])
@@ -846,6 +847,12 @@ class ItemTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals($this->model, $this->model->setOptions(null));
     }
 
+    /**
+     * @param $optionCode
+     * @param array $optionData
+     *
+     * @return \PHPUnit_Framework_MockObject_MockObject
+     */
     private function createOptionMock($optionCode, $optionData = [])
     {
         $optionMock = $this->getMockBuilder(\Magento\Quote\Model\Quote\Item\Option::class)
@@ -918,7 +925,7 @@ class ItemTest extends \PHPUnit\Framework\TestCase
             false,
             true,
             ['updateQtyOption']
-            );
+        );
         $productMock->expects($this->once())
             ->method('getTypeInstance')
             ->will($this->returnValue($typeInstanceMock));

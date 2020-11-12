@@ -102,7 +102,9 @@
             </container>
         </referenceContainer>
         <referenceContainer name="main">
-            <container name="content.top" label="Main Content Top"/>
+            <container name="content.top" label="Main Content Top">
+                <block name="main_css_preloader" as="main_css_preloader" template="Magento_Theme::html/main_css_preloader.phtml" ifconfig="dev/css/use_css_critical_path"/>
+            </container>
             <container name="content" label="Main Content Area"/>
             <container name="content.aside" label="Main Content Aside"/>
             <container name="content.bottom" label="Main Content Bottom"/>
@@ -119,7 +121,7 @@
                     </arguments>
                 </block>
                 <block class="Magento\Theme\Block\Html\Footer" name="copyright" template="Magento_Theme::html/copyright.phtml"/>
-                <block class="Magento\Framework\View\Element\Template" name="report.bugs" template="Magento_Theme::html/bugreport.phtml" />
+                <block class="Magento\Framework\View\Element\Template" name="report.bugs" template="Magento_Theme::html/bugreport.phtml" ifconfig="design/footer/report_bugs"/>
             </container>
         </referenceContainer>
         <referenceContainer name="before.body.end">

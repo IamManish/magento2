@@ -16,6 +16,8 @@ use Magento\Framework\Phrase;
 use Magento\Framework\Pricing\PriceCurrencyInterface;
 
 /**
+ * Attributes attributes block
+ *
  * @api
  * @since 100.0.2
  */
@@ -56,6 +58,8 @@ class Attributes extends \Magento\Framework\View\Element\Template
     }
 
     /**
+     * Returns a Product.
+     *
      * @return Product
      */
     public function getProduct()
@@ -67,6 +71,8 @@ class Attributes extends \Magento\Framework\View\Element\Template
     }
 
     /**
+     * Additional data.
+     *
      * $excludeAttr is optional array of attribute codes to
      * exclude them from additional data array
      *
@@ -83,17 +89,15 @@ class Attributes extends \Magento\Framework\View\Element\Template
             if ($attribute->getIsVisibleOnFront() && !in_array($attribute->getAttributeCode(), $excludeAttr)) {
                 $value = $attribute->getFrontend()->getValue($product);
 
-                if (!$product->hasData($attribute->getAttributeCode())) {
-                    $value = __('N/A');
-                } elseif ((string)$value == '') {
-                    $value = __('No');
+                if ($value instanceof Phrase) {
+                    $value = (string)$value;
                 } elseif ($attribute->getFrontendInput() == 'price' && is_string($value)) {
                     $value = $this->priceCurrency->convertAndFormat($value);
                 }
 
-                if ($value instanceof Phrase || (is_string($value) && strlen($value))) {
+                if (is_string($value) && strlen(trim($value))) {
                     $data[$attribute->getAttributeCode()] = [
-                        'label' => __($attribute->getStoreLabel()),
+                        'label' => $attribute->getStoreLabel(),
                         'value' => $value,
                         'code' => $attribute->getAttributeCode(),
                     ];

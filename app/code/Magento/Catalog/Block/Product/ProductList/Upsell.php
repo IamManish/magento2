@@ -4,12 +4,11 @@
  * See COPYING.txt for license details.
  */
 
-// @codingStandardsIgnoreFile
-
 namespace Magento\Catalog\Block\Product\ProductList;
 
+use Magento\Catalog\Block\Product\AbstractProduct;
 use Magento\Catalog\Model\ResourceModel\Product\Collection;
-use Magento\Framework\View\Element\AbstractBlock;
+use Magento\Framework\DataObject\IdentityInterface;
 
 /**
  * Catalog product upsell items block
@@ -18,7 +17,7 @@ use Magento\Framework\View\Element\AbstractBlock;
  * @SuppressWarnings(PHPMD.LongVariable)
  * @since 100.0.2
  */
-class Upsell extends \Magento\Catalog\Block\Product\AbstractProduct implements \Magento\Framework\DataObject\IdentityInterface
+class Upsell extends AbstractProduct implements IdentityInterface
 {
     /**
      * @var int
@@ -97,7 +96,7 @@ class Upsell extends \Magento\Catalog\Block\Product\AbstractProduct implements \
      */
     protected function _prepareData()
     {
-        $product = $this->_coreRegistry->registry('product');
+        $product = $this->getProduct();
         /* @var $product \Magento\Catalog\Model\Product */
         $this->_itemCollection = $product->getUpSellProductCollection()->setPositionOrder()->addStoreFilter();
         if ($this->moduleManager->isEnabled('Magento_Checkout')) {
@@ -140,7 +139,7 @@ class Upsell extends \Magento\Catalog\Block\Product\AbstractProduct implements \
          * getIdentities() depends on _itemCollection populated, but it can be empty if the block is hidden
          * @see https://github.com/magento/magento2/issues/5897
          */
-        if (is_null($this->_itemCollection)) {
+        if ($this->_itemCollection === null) {
             $this->_prepareData();
         }
         return $this->_itemCollection;
@@ -151,7 +150,7 @@ class Upsell extends \Magento\Catalog\Block\Product\AbstractProduct implements \
      */
     public function getItems()
     {
-        if (is_null($this->_items)) {
+        if ($this->_items === null) {
             $this->_items = $this->getItemCollection()->getItems();
         }
         return $this->_items;
@@ -171,8 +170,8 @@ class Upsell extends \Magento\Catalog\Block\Product\AbstractProduct implements \
      */
     public function setColumnCount($columns)
     {
-        if (intval($columns) > 0) {
-            $this->_columnCount = intval($columns);
+        if ((int)$columns > 0) {
+            $this->_columnCount = (int)$columns;
         }
         return $this;
     }
@@ -214,8 +213,8 @@ class Upsell extends \Magento\Catalog\Block\Product\AbstractProduct implements \
      */
     public function setItemLimit($type, $limit)
     {
-        if (intval($limit) > 0) {
-            $this->_itemLimits[$type] = intval($limit);
+        if ((int)$limit > 0) {
+            $this->_itemLimits[$type] = (int)$limit;
         }
         return $this;
     }

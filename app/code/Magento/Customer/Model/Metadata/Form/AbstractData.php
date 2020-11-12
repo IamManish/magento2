@@ -1,12 +1,8 @@
 <?php
 /**
- * Form Element Abstract Data Model
- *
  * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
-
-// @codingStandardsIgnoreFile
 
 namespace Magento\Customer\Model\Metadata\Form;
 
@@ -14,6 +10,8 @@ use Magento\Framework\Api\ArrayObjectSearch;
 use Magento\Framework\Validator\EmailAddress;
 
 /**
+ * Form Element Abstract Data Model.
+ *
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
 abstract class AbstractData
@@ -138,7 +136,8 @@ abstract class AbstractData
     }
 
     /**
-     * Set scope visibility
+     * Set scope visibility.
+     *
      * Search value only in scope or search value in scope and global
      *
      * @param boolean $flag
@@ -170,7 +169,7 @@ abstract class AbstractData
      */
     public function getExtractedData($index = null)
     {
-        if (!is_null($index)) {
+        if ($index !== null) {
             if (isset($this->_extractedData[$index])) {
                 return $this->_extractedData[$index];
             }
@@ -227,9 +226,9 @@ abstract class AbstractData
      */
     protected function _dateFilterFormat($format = null)
     {
-        if (is_null($format)) {
+        if ($format === null) {
             // get format
-            if (is_null($this->_dateFilterFormat)) {
+            if ($this->_dateFilterFormat === null) {
                 $this->_dateFilterFormat = \IntlDateFormatter::SHORT;
             }
             return $this->_localeDate->getDateFormat($this->_dateFilterFormat);
@@ -282,10 +281,14 @@ abstract class AbstractData
             'input_validation'
         );
 
-        if (!is_null($inputValidation)) {
+        if ($inputValidation !== null) {
+            $allowWhiteSpace = false;
             switch ($inputValidation) {
+                case 'alphanum-with-spaces':
+                    $allowWhiteSpace = true;
+                    // continue to alphanumeric validation
                 case 'alphanumeric':
-                    $validator = new \Zend_Validate_Alnum(true);
+                    $validator = new \Zend_Validate_Alnum($allowWhiteSpace);
                     $validator->setMessage(__('"%1" invalid type entered.', $label), \Zend_Validate_Alnum::INVALID);
                     $validator->setMessage(
                         __('"%1" contains non-alphabetic or non-numeric characters.', $label),
@@ -329,7 +332,8 @@ abstract class AbstractData
                     __("Invalid type given. String expected")
                     __("'%value%' appears to be a DNS hostname but contains a dash in an invalid position")
                     __("'%value%' does not match the expected structure for a DNS hostname")
-                    __("'%value%' appears to be a DNS hostname but cannot match against hostname schema for TLD '%tld%'")
+                    __("'%value%' appears to be a DNS hostname but cannot match
+                     * against hostname schema for TLD '%tld%'")
                     __("'%value%' does not appear to be a valid local network name")
                     __("'%value%' does not appear to be a valid URI hostname")
                     __("'%value%' appears to be an IP address, but IP addresses are not allowed")
@@ -384,7 +388,8 @@ abstract class AbstractData
                     );
                     $validator->setMessage(
                         __(
-                            "'%value%' looks like a DNS hostname but we cannot match it against the hostname schema for TLD '%tld%'."
+                            "'%value%' looks like a DNS hostname but we cannot match it against "
+                            . "the hostname schema for TLD '%tld%'."
                         ),
                         \Zend_Validate_Hostname::INVALID_HOSTNAME_SCHEMA
                     );

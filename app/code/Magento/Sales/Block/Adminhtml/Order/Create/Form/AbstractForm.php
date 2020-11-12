@@ -5,7 +5,6 @@
  */
 namespace Magento\Sales\Block\Adminhtml\Order\Create\Form;
 
-use Magento\Framework\Convert\ConvertArray;
 use Magento\Framework\Pricing\PriceCurrencyInterface;
 
 /**
@@ -97,6 +96,11 @@ abstract class AbstractForm extends \Magento\Sales\Block\Adminhtml\Order\Create\
     public function getForm()
     {
         if ($this->_form === null) {
+            $storeId = $this->getCreateOrderModel()
+                ->getSession()
+                ->getStoreId();
+            $this->_storeManager->setCurrentStore($storeId);
+
             $this->_form = $this->_formFactory->create();
             $this->_prepareForm();
         }

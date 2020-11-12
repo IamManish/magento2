@@ -6,9 +6,9 @@
 
 namespace Magento\Payment\Test\Unit\Helper;
 
-use \Magento\Payment\Helper\Data;
-
 use Magento\Framework\TestFramework\Unit\Matcher\MethodInvokedAtIndex;
+use Magento\Payment\Helper\Data;
+use Magento\Store\Model\ScopeInterface;
 
 class DataTest extends \PHPUnit\Framework\TestCase
 {
@@ -17,6 +17,9 @@ class DataTest extends \PHPUnit\Framework\TestCase
 
     /**  @var \PHPUnit_Framework_MockObject_MockObject */
     private $scopeConfig;
+
+    /**  @var \PHPUnit_Framework_MockObject_MockObject */
+    private $paymentConfig;
 
     /**  @var \PHPUnit_Framework_MockObject_MockObject */
     private $initialConfig;
@@ -34,6 +37,9 @@ class DataTest extends \PHPUnit\Framework\TestCase
      */
     private $appEmulation;
 
+    /**
+     * @inheritDoc
+     */
     protected function setUp()
     {
         $objectManagerHelper = new \Magento\Framework\TestFramework\Unit\Helper\ObjectManager($this);
@@ -48,11 +54,15 @@ class DataTest extends \PHPUnit\Framework\TestCase
 
         $this->methodFactory = $arguments['paymentMethodFactory'];
         $this->appEmulation = $arguments['appEmulation'];
+        $this->paymentConfig = $arguments['paymentConfig'];
         $this->initialConfig = $arguments['initialConfig'];
 
         $this->helper = $objectManagerHelper->getObject($className, $arguments);
     }
 
+    /**
+     * @return void
+     */
     public function testGetMethodInstance()
     {
         list($code, $class, $methodInstance) = ['method_code', 'method_class', 'method_instance'];
@@ -166,6 +176,9 @@ class DataTest extends \PHPUnit\Framework\TestCase
         );
     }
 
+    /**
+     * @return void
+     */
     public function testGetMethodFormBlock()
     {
         list($blockType, $methodCode) = ['method_block_type', 'method_code'];
@@ -191,6 +204,9 @@ class DataTest extends \PHPUnit\Framework\TestCase
         $this->assertSame($blockMock, $this->helper->getMethodFormBlock($methodMock, $layoutMock));
     }
 
+    /**
+     * @return void`
+     */
     public function testGetInfoBlock()
     {
         $blockType = 'method_block_type';
@@ -216,6 +232,9 @@ class DataTest extends \PHPUnit\Framework\TestCase
         $this->assertSame($blockMock, $this->helper->getInfoBlock($infoMock));
     }
 
+    /**
+     * @return void
+     */
     public function testGetInfoBlockHtml()
     {
         list($storeId, $blockHtml, $secureMode, $blockType) = [1, 'HTML MARKUP', true, 'method_block_type'];
@@ -253,6 +272,9 @@ class DataTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals($blockHtml, $this->helper->getInfoBlockHtml($infoMock, $storeId));
     }
 
+    /**
+     * @return array
+     */
     public function getSortMethodsDataProvider()
     {
         return [
@@ -264,6 +286,119 @@ class DataTest extends \PHPUnit\Framework\TestCase
                 ['code' => 'methodA', 'data' => ['sort_order' => 2]],
                 ['code' => 'methodB', 'data' => ['sort_order' => 1]],
             ]
+        ];
+    }
+
+    /**
+     * @param bool $sorted
+     * @param bool $asLabelValue
+     * @param bool $withGroups
+     * @param string|null $configTitle
+     * @param array $paymentMethod
+     * @param array $expectedPaymentMethodList
+     * @return void
+     *
+     * @dataProvider paymentMethodListDataProvider
+     */
+    public function testGetPaymentMethodList(
+        bool $sorted,
+        bool $asLabelValue,
+        bool $withGroups,
+        $configTitle,
+        array $paymentMethod,
+        array $expectedPaymentMethodList
+    ) {
+        $groups = ['group' => 'Group Title'];
+
+        $this->initialConfig->method('getData')
+            ->with('default')
+            ->willReturn(
+                [
+                    Data::XML_PATH_PAYMENT_METHODS => [
+                        $paymentMethod['code'] => $paymentMethod['data'],
+                    ],
+                ]
+            );
+
+        $titlePath = sprintf('%s/%s/title', Data::XML_PATH_PAYMENT_METHODS, $paymentMethod['code']);
+        $this->scopeConfig->method('getValue')
+            ->with($titlePath, ScopeInterface::SCOPE_STORE, null)
+            ->willReturn($configTitle);
+
+        $this->paymentConfig->method('getGroups')
+            ->willReturn($groups);
+
+        $paymentMethodList = $this->helper->getPaymentMethodList($sorted, $asLabelValue, $withGroups);
+        $this->assertEquals($expectedPaymentMethodList, $paymentMethodList);
+    }
+
+    /**
+     * @return array
+     */
+    public function paymentMethodListDataProvider(): array
+    {
+        return [
+            'Payment method with changed title' =>
+                [
+                    true,
+                    false,
+                    false,
+                    'Config Payment Title',
+                    [
+                        'code' => 'payment_method',
+                        'data' => [
+                            'active' => 1,
+                            'title' => 'Payment Title',
+                        ],
+                    ],
+                    ['payment_method' => 'Config Payment Title'],
+                ],
+            'Payment method as value => label' =>
+                [
+                    true,
+                    true,
+                    false,
+                    'Payment Title',
+                    [
+                        'code' => 'payment_method',
+                        'data' => [
+                            'active' => 1,
+                            'title' => 'Payment Title',
+                        ],
+                    ],
+                    [
+                        'payment_method' => [
+                            'value' => 'payment_method',
+                            'label' => 'Payment Title',
+                        ],
+                    ],
+                ],
+            'Payment method with group' =>
+                [
+                    true,
+                    true,
+                    true,
+                    'Payment Title',
+                    [
+                        'code' => 'payment_method',
+                        'data' => [
+                            'active' => 1,
+                            'title' => 'Payment Title',
+                            'group' => 'group',
+                        ],
+                    ],
+                    [
+                        'group' => [
+                            'label' => 'Group Title',
+                            'value' => [
+                                'payment_method' => [
+                                    'value' => 'payment_method',
+                                    'label' => 'Payment Title',
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
         ];
     }
 }

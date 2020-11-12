@@ -4,11 +4,12 @@
  * See COPYING.txt for license details.
  */
 
-// @codingStandardsIgnoreFile
-
 namespace Magento\Catalog\Model\ResourceModel;
 
 use Magento\Eav\Model\Entity\Attribute\AbstractAttribute;
+use Magento\Eav\Model\Entity\Attribute\Backend\AbstractBackend;
+use Magento\Eav\Model\Entity\Attribute\Frontend\AbstractFrontend;
+use Magento\Eav\Model\Entity\Attribute\Source\AbstractSource;
 
 /**
  * Catalog entity abstract model
@@ -80,7 +81,7 @@ abstract class AbstractResource extends \Magento\Eav\Model\Entity\AbstractEntity
      */
     protected function _isApplicableAttribute($object, $attribute)
     {
-        $applyTo = $attribute->getApplyTo();
+        $applyTo = $attribute->getApplyTo() ?: [];
         return (count($applyTo) == 0 || in_array($object->getTypeId(), $applyTo))
             && $attribute->isInSet($object->getAttributeSetId());
     }
@@ -88,18 +89,21 @@ abstract class AbstractResource extends \Magento\Eav\Model\Entity\AbstractEntity
     /**
      * Check whether attribute instance (attribute, backend, frontend or source) has method and applicable
      *
-     * @param AbstractAttribute|\Magento\Eav\Model\Entity\Attribute\Backend\AbstractBackend|\Magento\Eav\Model\Entity\Attribute\Frontend\AbstractFrontend|\Magento\Eav\Model\Entity\Attribute\Source\AbstractSource $instance
+     * @param AbstractAttribute|AbstractBackend|AbstractFrontend|AbstractSource $instance
      * @param string $method
      * @param array $args array of arguments
      * @return boolean
      */
     protected function _isCallableAttributeInstance($instance, $method, $args)
     {
-        if ($instance instanceof \Magento\Eav\Model\Entity\Attribute\Backend\AbstractBackend
+        if ($instance instanceof AbstractBackend
             && ($method == 'beforeSave' || $method == 'afterSave')
         ) {
             $attributeCode = $instance->getAttribute()->getAttributeCode();
-            if (isset($args[0]) && $args[0] instanceof \Magento\Framework\DataObject && $args[0]->getData($attributeCode) === false) {
+            if (isset($args[0])
+                && $args[0] instanceof \Magento\Framework\DataObject
+                && $args[0]->getData($attributeCode) === false
+            ) {
                 return false;
             }
         }
@@ -177,7 +181,10 @@ abstract class AbstractResource extends \Magento\Eav\Model\Entity\AbstractEntity
     protected function _saveAttributeValue($object, $attribute, $value)
     {
         $connection = $this->getConnection();
-        $storeId = (int) $this->_storeManager->getStore($object->getStoreId())->getId();
+        $hasSingleStore = $this->_storeManager->hasSingleStore();
+        $storeId = $hasSingleStore
+            ? $this->getDefaultStoreId()
+            : (int) $this->_storeManager->getStore($object->getStoreId())->getId();
         $table = $attribute->getBackend()->getTable();
 
         /**
@@ -186,15 +193,18 @@ abstract class AbstractResource extends \Magento\Eav\Model\Entity\AbstractEntity
          * In this case we clear all not default values
          */
         $entityIdField = $this->getLinkField();
-        if ($this->_storeManager->hasSingleStore()) {
-            $storeId = $this->getDefaultStoreId();
+        $conditions = [
+            'attribute_id = ?' => $attribute->getAttributeId(),
+            "{$entityIdField} = ?" => $object->getData($entityIdField),
+            'store_id <> ?' => $storeId
+        ];
+        if ($hasSingleStore
+            && !$object->isObjectNew()
+            && $this->isAttributePresentForNonDefaultStore($attribute, $conditions)
+        ) {
             $connection->delete(
                 $table,
-                [
-                    'attribute_id = ?' => $attribute->getAttributeId(),
-                    "{$entityIdField} = ?" => $object->getData($entityIdField),
-                    'store_id <> ?' => $storeId
-                ]
+                $conditions
             );
         }
 
@@ -231,6 +241,27 @@ abstract class AbstractResource extends \Magento\Eav\Model\Entity\AbstractEntity
         }
 
         return $this;
+    }
+
+    /**
+     * Check if attribute present for non default Store View.
+     * Prevent "delete" query locking in a case when nothing to delete
+     *
+     * @param AbstractAttribute $attribute
+     * @param array $conditions
+     *
+     * @return boolean
+     */
+    private function isAttributePresentForNonDefaultStore($attribute, $conditions)
+    {
+        $connection = $this->getConnection();
+        $select = $connection->select()->from($attribute->getBackend()->getTable());
+        foreach ($conditions as $condition => $conditionValue) {
+            $select->where($condition, $conditionValue);
+        }
+        $select->limit(1);
+
+        return !empty($connection->fetchRow($select));
     }
 
     /**
@@ -568,8 +599,7 @@ abstract class AbstractResource extends \Magento\Eav\Model\Entity\AbstractEntity
         }
 
         if (is_array($attributesData) && sizeof($attributesData) == 1) {
-            $_data = each($attributesData);
-            $attributesData = $_data[1];
+            $attributesData = array_shift($attributesData);
         }
 
         return $attributesData === false ? false : $attributesData;

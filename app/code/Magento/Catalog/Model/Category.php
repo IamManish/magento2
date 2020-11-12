@@ -71,6 +71,11 @@ class Category extends \Magento\Catalog\Model\AbstractModel implements
 
     const CACHE_TAG = 'cat_c';
 
+    /**
+     * Category Store Id
+     */
+    const STORE_ID = 'store_id';
+
     /**#@+
      * Constants
      */
@@ -113,6 +118,11 @@ class Category extends \Magento\Catalog\Model\AbstractModel implements
     protected $_url;
 
     /**
+     * @var ResourceModel\Category
+     */
+    protected $_resource;
+
+    /**
      * URL rewrite model
      *
      * @var \Magento\UrlRewrite\Model\UrlRewrite
@@ -139,6 +149,8 @@ class Category extends \Magento\Catalog\Model\AbstractModel implements
         'page_layout',
         'custom_layout_update',
         'custom_apply_to_products',
+        'custom_layout_update_file',
+        'custom_use_parent_settings'
     ];
 
     /**
@@ -333,6 +345,18 @@ class Category extends \Magento\Catalog\Model\AbstractModel implements
     }
 
     /**
+     * @throws \Magento\Framework\Exception\LocalizedException
+     * @return \Magento\Catalog\Model\ResourceModel\Category
+     * @deprecated because resource models should be used directly
+     * phpcs:disable Generic.CodeAnalysis.UselessOverridingMethod
+     */
+    protected function _getResource()
+    {
+        //phpcs:enable Generic.CodeAnalysis.UselessOverridingMethod
+        return parent::_getResource();
+    }
+
+    /**
      * Get flat resource model flag
      *
      * @return bool
@@ -484,7 +508,7 @@ class Category extends \Magento\Catalog\Model\AbstractModel implements
      * Retrieve all customer attributes
      *
      * @param bool $noDesignAttributes
-     * @return array
+     * @return \Magento\Eav\Api\Data\AttributeInterface[]
      * @todo Use with Flat Resource
      * @SuppressWarnings(PHPMD.UnusedLocalVariable)
      */
@@ -573,12 +597,12 @@ class Category extends \Magento\Catalog\Model\AbstractModel implements
      *
      * If store id is underfined for category return current active store id
      *
-     * @return integer
+     * @return int
      */
     public function getStoreId()
     {
-        if ($this->hasData('store_id')) {
-            return (int)$this->_getData('store_id');
+        if ($this->hasData(self::STORE_ID)) {
+            return (int)$this->_getData(self::STORE_ID);
         }
         return (int)$this->_storeManager->getStore()->getId();
     }
@@ -594,7 +618,7 @@ class Category extends \Magento\Catalog\Model\AbstractModel implements
         if (!is_numeric($storeId)) {
             $storeId = $this->_storeManager->getStore($storeId)->getId();
         }
-        $this->setData('store_id', $storeId);
+        $this->setData(self::STORE_ID, $storeId);
         $this->getResource()->setStoreId($storeId);
         return $this;
     }
@@ -706,7 +730,7 @@ class Category extends \Magento\Catalog\Model\AbstractModel implements
             return $parentId;
         }
         $parentIds = $this->getParentIds();
-        return intval(array_pop($parentIds));
+        return (int)array_pop($parentIds);
     }
 
     /**
@@ -736,7 +760,7 @@ class Category extends \Magento\Catalog\Model\AbstractModel implements
     /**
      * Retrieve design attributes array
      *
-     * @return array
+     * @return \Magento\Eav\Api\Data\AttributeInterface[]
      */
     public function getDesignAttributes()
     {
@@ -943,8 +967,11 @@ class Category extends \Magento\Catalog\Model\AbstractModel implements
      */
     public function getProductCount()
     {
-        $count = $this->_getResource()->getProductCount($this);
-        $this->setData(self::KEY_PRODUCT_COUNT, $count);
+        if (!$this->hasData(self::KEY_PRODUCT_COUNT)) {
+            $count = $this->_getResource()->getProductCount($this);
+            $this->setData(self::KEY_PRODUCT_COUNT, $count);
+        }
+
         return $this->getData(self::KEY_PRODUCT_COUNT);
     }
 
@@ -1107,10 +1134,15 @@ class Category extends \Magento\Catalog\Model\AbstractModel implements
             }
         }
         $productIndexer = $this->indexerRegistry->get(Indexer\Category\Product::INDEXER_ID);
-        if (!$productIndexer->isScheduled()
-            && (!empty($this->getAffectedProductIds()) || $this->dataHasChangedFor('is_anchor'))
-        ) {
-            $productIndexer->reindexList($this->getPathIds());
+
+        if (!empty($this->getAffectedProductIds())
+            || $this->dataHasChangedFor('is_anchor')
+            || $this->dataHasChangedFor('is_active')) {
+            if (!$productIndexer->isScheduled()) {
+                $productIndexer->reindexList($this->getPathIds());
+            } else {
+                $productIndexer->invalidate();
+            }
         }
     }
 
@@ -1132,16 +1164,24 @@ class Category extends \Magento\Catalog\Model\AbstractModel implements
      */
     public function getIdentities()
     {
-        $identities = [
-            self::CACHE_TAG . '_' . $this->getId(),
-        ];
-        if (!$this->getId() || $this->hasDataChanges()
-            || $this->isDeleted() || $this->dataHasChangedFor(self::KEY_INCLUDE_IN_MENU)
-        ) {
-            $identities[] = self::CACHE_TAG;
-            $identities[] = Product::CACHE_PRODUCT_CATEGORY_TAG . '_' . $this->getId();
+        $identities = [];
+        if ($this->getId()) {
+            if ($this->getAffectedCategoryIds()) {
+                foreach (array_unique($this->getAffectedCategoryIds()) as $affectedCategoryId) {
+                    $identities[] = self::CACHE_TAG . '_' . $affectedCategoryId;
+                }
+            } else {
+                $identities[] = self::CACHE_TAG . '_' . $this->getId();
+            }
+
+            $identities = $this->getCategoryRelationIdentities($identities);
+
+            if ($this->isObjectNew()) {
+                $identities[] = self::CACHE_TAG;
+            }
         }
-        return $identities;
+
+        return array_unique($identities);
     }
 
     /**
@@ -1425,6 +1465,26 @@ class Category extends \Magento\Catalog\Model\AbstractModel implements
     public function setExtensionAttributes(\Magento\Catalog\Api\Data\CategoryExtensionInterface $extensionAttributes)
     {
         return $this->_setExtensionAttributes($extensionAttributes);
+    }
+
+    /**
+     * Return category relation identities.
+     *
+     * @param array $identities
+     * @return array
+     */
+    private function getCategoryRelationIdentities(array $identities): array
+    {
+        if ($this->hasDataChanges() || $this->isDeleted() || $this->dataHasChangedFor(self::KEY_INCLUDE_IN_MENU)) {
+            $identities[] = Product::CACHE_PRODUCT_CATEGORY_TAG . '_' . $this->getId();
+            if ($this->dataHasChangedFor('is_anchor') || $this->dataHasChangedFor('is_active')) {
+                foreach ($this->getPathIds() as $id) {
+                    $identities[] = Product::CACHE_PRODUCT_CATEGORY_TAG . '_' . $id;
+                }
+            }
+        }
+
+        return $identities;
     }
 
     //@codeCoverageIgnoreEnd

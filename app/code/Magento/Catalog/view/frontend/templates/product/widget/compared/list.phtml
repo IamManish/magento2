@@ -4,15 +4,13 @@
  * See COPYING.txt for license details.
  */
 
- //@codingStandardsIgnoreFile
+// phpcs:disable PSR2.Files.ClosingTag
 ?>
 <?php
-/**
- * @var $block \Magento\Ui\Block\Wrapper
- */
+/** @var $block \Magento\Ui\Block\Wrapper */
 ?>
 
-<?php /* @escapeNotVerified */ echo $block->renderApp(
+<?= /* @noEscape */ $block->renderApp(
     [
         'widget_columns' => [
             'displayMode' => 'list'
@@ -21,4 +19,4 @@
             'imageCode' => 'recently_compared_products_list_content_widget'
         ]
     ]
-);
+); ?>

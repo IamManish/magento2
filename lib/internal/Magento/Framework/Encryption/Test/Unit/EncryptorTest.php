@@ -7,10 +7,11 @@ namespace Magento\Framework\Encryption\Test\Unit;
 
 use Magento\Framework\Encryption\Encryptor;
 use Magento\Framework\Encryption\Crypt;
-use Magento\Framework\App\DeploymentConfig;
 
 class EncryptorTest extends \PHPUnit\Framework\TestCase
 {
+    const CRYPT_KEY = 'g9mY9KLrcuAVJfsmVUSRkKFLDdUPVkaZ';
+
     /**
      * @var \Magento\Framework\Encryption\Encryptor
      */
@@ -21,6 +22,9 @@ class EncryptorTest extends \PHPUnit\Framework\TestCase
      */
     protected $_randomGenerator;
 
+    /**
+     * @inheritdoc
+     */
     protected function setUp()
     {
         $this->_randomGenerator = $this->createMock(\Magento\Framework\Math\Random::class);
@@ -29,17 +33,23 @@ class EncryptorTest extends \PHPUnit\Framework\TestCase
             ->method('get')
             ->with(Encryptor::PARAM_CRYPT_KEY)
             ->will($this->returnValue('cryptKey'));
-        $this->_model = new \Magento\Framework\Encryption\Encryptor($this->_randomGenerator, $deploymentConfigMock);
+        $this->_model = new Encryptor($this->_randomGenerator, $deploymentConfigMock);
     }
 
+    /**
+     * Hashing without a salt.
+     */
     public function testGetHashNoSalt()
     {
         $this->_randomGenerator->expects($this->never())->method('getRandomString');
-        $expected = '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8';
+        $expected = '2c7d52d272ca4899fbffa05e52e0c77ae5a51e6001b13b9021b040e8267a596e';
         $actual = $this->_model->getHash('password');
         $this->assertEquals($expected, $actual);
     }
 
+    /**
+     * Providing salt for hash.
+     */
     public function testGetHashSpecifiedSalt()
     {
         $this->_randomGenerator->expects($this->never())->method('getRandomString');
@@ -48,6 +58,9 @@ class EncryptorTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals($expected, $actual);
     }
 
+    /**
+     * Hashing with random salt.
+     */
     public function testGetHashRandomSaltDefaultLength()
     {
         $salt = '-----------random_salt----------';
@@ -61,6 +74,9 @@ class EncryptorTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals($expected, $actual);
     }
 
+    /**
+     * Hashing with random salt of certain length.
+     */
     public function testGetHashRandomSaltSpecifiedLength()
     {
         $this->_randomGenerator
@@ -74,6 +90,8 @@ class EncryptorTest extends \PHPUnit\Framework\TestCase
     }
 
     /**
+     * Validating a hash.
+     *
      * @param string $password
      * @param string $hash
      * @param bool $expected
@@ -86,6 +104,11 @@ class EncryptorTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals($expected, $actual);
     }
 
+    /**
+     * List of values and their hashes using different algorithms.
+     *
+     * @return array
+     */
     public function validateHashDataProvider()
     {
         return [
@@ -96,9 +119,10 @@ class EncryptorTest extends \PHPUnit\Framework\TestCase
     }
 
     /**
-     * @param mixed $key
+     * Encrypting with empty keys.
      *
-     * @dataProvider encryptWithEmptyKeyDataProvider
+     * @param mixed $key
+     * @dataProvider emptyKeyDataProvider
      */
     public function testEncryptWithEmptyKey($key)
     {
@@ -112,7 +136,12 @@ class EncryptorTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals($value, $model->encrypt($value));
     }
 
-    public function encryptWithEmptyKeyDataProvider()
+    /**
+     * List of invalid keys.
+     *
+     * @return array
+     */
+    public function emptyKeyDataProvider()
     {
         return [[null], [0], [''], ['0']];
     }
@@ -120,7 +149,7 @@ class EncryptorTest extends \PHPUnit\Framework\TestCase
     /**
      * @param mixed $key
      *
-     * @dataProvider decryptWithEmptyKeyDataProvider
+     * @dataProvider emptyKeyDataProvider
      */
     public function testDecryptWithEmptyKey($key)
     {
@@ -134,11 +163,9 @@ class EncryptorTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals('', $model->decrypt($value));
     }
 
-    public function decryptWithEmptyKeyDataProvider()
-    {
-        return [[null], [0], [''], ['0']];
-    }
-
+    /**
+     * Seeing that encrypting uses RIJNDAEL_256.
+     */
     public function testEncrypt()
     {
         // sample data to encrypt
@@ -148,14 +175,16 @@ class EncryptorTest extends \PHPUnit\Framework\TestCase
 
         // Extract the initialization vector and encrypted data
         $parts = explode(':', $actual, 4);
-        list(, , $iv, $encryptedData) = $parts;
 
         // Decrypt returned data with RIJNDAEL_256 cipher, cbc mode
-        $crypt = new Crypt('cryptKey', MCRYPT_RIJNDAEL_256, MCRYPT_MODE_CBC, $iv);
+        $crypt = new Crypt('cryptKey', MCRYPT_RIJNDAEL_256, MCRYPT_MODE_CBC, $parts[2]);
         // Verify decrypted matches original data
-        $this->assertEquals($data, $crypt->decrypt(base64_decode((string)$encryptedData)));
+        $this->assertEquals($data, $crypt->decrypt(base64_decode((string)$parts[3])));
     }
 
+    /**
+     * Check that decrypting works.
+     */
     public function testDecrypt()
     {
         // sample data to encrypt
@@ -166,14 +195,16 @@ class EncryptorTest extends \PHPUnit\Framework\TestCase
 
         // Extract the initialization vector and encrypted data
         $parts = explode(':', $data, 4);
-        list(, , $iv, $encrypted) = $parts;
 
         // Decrypt returned data with RIJNDAEL_256 cipher, cbc mode
-        $crypt = new Crypt('cryptKey', MCRYPT_RIJNDAEL_256, MCRYPT_MODE_CBC, $iv);
+        $crypt = new Crypt('cryptKey', MCRYPT_RIJNDAEL_256, MCRYPT_MODE_CBC, $parts[2]);
         // Verify decrypted matches original data
-        $this->assertEquals($encrypted, base64_encode($crypt->encrypt($actual)));
+        $this->assertEquals($parts[3], base64_encode($crypt->encrypt($actual)));
     }
 
+    /**
+     * Seeing that changing a key does not stand in a way of decrypting.
+     */
     public function testEncryptDecryptNewKeyAdded()
     {
         $deploymentConfigMock = $this->createMock(\Magento\Framework\App\DeploymentConfig::class);
@@ -198,6 +229,9 @@ class EncryptorTest extends \PHPUnit\Framework\TestCase
         $this->assertSame($data, $decryptedData, 'Encryptor failed to decrypt data encrypted by old keys.');
     }
 
+    /**
+     * Checking that encryptor relies on key validator.
+     */
     public function testValidateKey()
     {
         $actual = $this->_model->validateKey('some_key');
@@ -206,5 +240,77 @@ class EncryptorTest extends \PHPUnit\Framework\TestCase
         $actualEncryptedData = base64_encode($actual->encrypt('data'));
         $this->assertEquals($expectedEncryptedData, $actualEncryptedData);
         $this->assertEquals($crypt->decrypt($expectedEncryptedData), $actual->decrypt($actualEncryptedData));
+    }
+
+    /**
+     * Algorithms and expressions to validate them.
+     *
+     * @return array
+     */
+    public function testUseSpecifiedHashingAlgoDataProvider()
+    {
+        return [
+            [
+                'password',
+                'salt',
+                Encryptor::HASH_VERSION_MD5,
+                '/^[a-z0-9]{32}\:salt\:0$/'
+            ],
+            [
+                'password',
+                'salt',
+                Encryptor::HASH_VERSION_SHA256,
+                '/^[a-z0-9]{64}\:salt\:1$/'
+            ],
+            [
+                'password',
+                false,
+                Encryptor::HASH_VERSION_MD5,
+                '/^[0-9a-z]{32}$/'
+            ],
+            [
+                'password',
+                false,
+                Encryptor::HASH_VERSION_SHA256,
+                '/^[0-9a-z]{64}$/'
+            ]
+        ];
+    }
+
+    /**
+     * Check that specified algorithm is in fact being used.
+     *
+     * @dataProvider testUseSpecifiedHashingAlgoDataProvider
+     *
+     * @param string $password
+     * @param string|bool $salt
+     * @param int $hashAlgo
+     * @param string $pattern
+     */
+    public function testGetHashMustUseSpecifiedHashingAlgo($password, $salt, $hashAlgo, $pattern)
+    {
+        $hash = $this->_model->getHash($password, $salt, $hashAlgo);
+        $this->assertRegExp($pattern, $hash);
+    }
+
+    /**
+     * Test hashing working as promised.
+     */
+    public function testHash()
+    {
+        //Checking that the same hash is returned for the same value.
+        $hash1 = $this->_model->hash($value = 'some value');
+        $hash2 = $this->_model->hash($value);
+        $this->assertEquals($hash1, $hash2);
+
+        //Checking that hash works with hash validation.
+        $this->assertTrue($this->_model->isValidHash($value, $hash1));
+
+        //Checking that key matters.
+        $this->_model->setNewKey(self::CRYPT_KEY);
+        $hash3 = $this->_model->hash($value);
+        $this->assertNotEquals($hash3, $hash1);
+        //Validation still works
+        $this->assertTrue($this->_model->validateHash($value, $hash3));
     }
 }

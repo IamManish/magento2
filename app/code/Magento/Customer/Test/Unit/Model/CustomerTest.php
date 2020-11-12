@@ -12,10 +12,12 @@
 namespace Magento\Customer\Test\Unit\Model;
 
 use Magento\Customer\Model\Customer;
-use Magento\Store\Model\ScopeInterface;
+use Magento\Customer\Model\AccountConfirmation;
+use Magento\Framework\Math\Random;
 
 /**
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @SuppressWarnings(PHPMD.TooManyFields)
  */
 class CustomerTest extends \PHPUnit\Framework\TestCase
 {
@@ -63,6 +65,19 @@ class CustomerTest extends \PHPUnit\Framework\TestCase
      */
     private $dataObjectProcessor;
 
+    /**
+     * @var AccountConfirmation|\PHPUnit_Framework_MockObject_MockObject
+     */
+    private $accountConfirmation;
+
+    /**
+     * @var Random|\PHPUnit_Framework_MockObject_MockObject
+     */
+    private $mathRandom;
+
+    /**
+     * @inheritdoc
+     */
     protected function setUp()
     {
         $this->_website = $this->createMock(\Magento\Store\Model\Website::class);
@@ -94,6 +109,8 @@ class CustomerTest extends \PHPUnit\Framework\TestCase
         $this->registryMock = $this->createPartialMock(\Magento\Framework\Registry::class, ['registry']);
         $this->_encryptor = $this->createMock(\Magento\Framework\Encryption\EncryptorInterface::class);
         $helper = new \Magento\Framework\TestFramework\Unit\Helper\ObjectManager($this);
+        $this->accountConfirmation = $this->createMock(AccountConfirmation::class);
+        $this->mathRandom = $this->createMock(Random::class);
         $this->_model = $helper->getObject(
             \Magento\Customer\Model\Customer::class,
             [
@@ -105,7 +122,9 @@ class CustomerTest extends \PHPUnit\Framework\TestCase
                 'attributeFactory' => $this->attributeFactoryMock,
                 'registry' => $this->registryMock,
                 'resource' => $this->resourceMock,
-                'dataObjectProcessor' => $this->dataObjectProcessor
+                'dataObjectProcessor' => $this->dataObjectProcessor,
+                'accountConfirmation' => $this->accountConfirmation,
+                'mathRandom' => $this->mathRandom,
             ]
         );
     }
@@ -215,31 +234,26 @@ class CustomerTest extends \PHPUnit\Framework\TestCase
     /**
      * @param int $customerId
      * @param int $websiteId
-     * @param string|null $skipConfirmationIfEmail
+     * @param bool $isConfirmationRequired
      * @param bool $expected
      * @dataProvider dataProviderIsConfirmationRequired
      */
     public function testIsConfirmationRequired(
         $customerId,
         $websiteId,
-        $skipConfirmationIfEmail,
+        $isConfirmationRequired,
         $expected
     ) {
         $customerEmail = 'test1@example.com';
 
-        $this->registryMock->expects($this->any())
-            ->method('registry')
-            ->with('skip_confirmation_if_email')
-            ->willReturn($skipConfirmationIfEmail);
-
-        $this->_scopeConfigMock->expects($this->any())
-            ->method('getValue')
-            ->with(Customer::XML_PATH_IS_CONFIRM, ScopeInterface::SCOPE_WEBSITES, $websiteId)
-            ->willReturn($expected);
-
         $this->_model->setData('id', $customerId);
         $this->_model->setData('website_id', $websiteId);
         $this->_model->setData('email', $customerEmail);
+
+        $this->accountConfirmation->expects($this->once())
+            ->method('isConfirmationRequired')
+            ->with($websiteId, $customerId, $customerEmail)
+            ->willReturn($isConfirmationRequired);
 
         $this->assertEquals($expected, $this->_model->isConfirmationRequired());
     }
@@ -250,12 +264,9 @@ class CustomerTest extends \PHPUnit\Framework\TestCase
     public function dataProviderIsConfirmationRequired()
     {
         return [
-            [null, null, null, false],
-            [1, 1, null, false],
-            [1, 1, 'test1@example.com', false],
-            [1, 1, 'test2@example.com', true],
-            [1, 0, 'test2@example.com', true],
-            [1, null, 'test2@example.com', true],
+            [null, null, false, false],
+            [1, 1, true, true],
+            [1, null, true, true],
         ];
     }
 
@@ -308,9 +319,23 @@ class CustomerTest extends \PHPUnit\Framework\TestCase
         }
 
         $expectedResult[$attribute->getAttributeCode()] = $attribute->getValue();
-        $expectedResult['attribute_set_id'] =
-            \Magento\Customer\Api\CustomerMetadataInterface::ATTRIBUTE_SET_ID_CUSTOMER;
 
         $this->assertEquals($this->_model->getData(), $expectedResult);
+    }
+
+    /**
+     * Check getRandomConfirmationKey use cryptographically secure function
+     *
+     * @return void
+     */
+    public function testGetRandomConfirmationKey()
+    {
+        $this->mathRandom
+            ->expects($this->once())
+            ->method('getRandomString')
+            ->with(32)
+            ->willReturn('random_string');
+
+        $this->_model->getRandomConfirmationKey();
     }
 }

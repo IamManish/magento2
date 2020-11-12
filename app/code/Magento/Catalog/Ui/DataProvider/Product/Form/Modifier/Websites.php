@@ -135,7 +135,6 @@ class Websites extends AbstractModifier
                                     'collapsible' => true,
                                     'componentType' => Form\Fieldset::NAME,
                                     'dataScope' => self::DATA_SCOPE_PRODUCT,
-                                    'disabled' => false,
                                     'sortOrder' => $this->getNextGroupSortOrder(
                                         $meta,
                                         'search-engine-optimization',
@@ -176,9 +175,11 @@ class Websites extends AbstractModifier
         $label = __('Websites');
 
         $defaultWebsiteId = $this->websiteRepository->getDefault()->getId();
+        $isOnlyOneWebsiteAvailable = count($websitesList) === 1;
         foreach ($websitesList as $website) {
             $isChecked = in_array($website['id'], $websiteIds)
-                || ($defaultWebsiteId == $website['id'] && $isNewProduct);
+                || ($defaultWebsiteId == $website['id'] && $isNewProduct)
+                || $isOnlyOneWebsiteAvailable;
             $children[$website['id']] = [
                 'arguments' => [
                     'data' => [
@@ -187,6 +188,7 @@ class Websites extends AbstractModifier
                             'componentType' => Form\Field::NAME,
                             'formElement' => Form\Element\Checkbox::NAME,
                             'description' => __($website['name']),
+                            '__disableTmpl' => true,
                             'tooltip' => $tooltip,
                             'sortOrder' => $sortOrder,
                             'dataScope' => 'website_ids.' . $website['id'],
@@ -196,6 +198,7 @@ class Websites extends AbstractModifier
                                 'false' => '0',
                             ],
                             'value' => $isChecked ? (string)$website['id'] : '0',
+                            'disabled' => $this->locator->getProduct()->isLockedAttribute('website_ids'),
                         ],
                     ],
                 ],
@@ -351,18 +354,21 @@ class Websites extends AbstractModifier
             $websiteOption = [
                 'value' => '0.' . $website['id'],
                 'label' => __($website['name']),
+                '__disableTmpl' => true,
             ];
             $groupOptions = [];
             foreach ($website['groups'] as $group) {
                 $groupOption = [
                     'value' => '0.' . $website['id'] . '.' . $group['id'],
                     'label' => __($group['name']),
+                    '__disableTmpl' => true,
                 ];
                 $storeViewOptions = [];
                 foreach ($group['stores'] as $storeView) {
                     $storeViewOptions[] = [
                         'value' => $storeView['id'],
                         'label' => __($storeView['name']),
+                        '__disableTmpl' => true,
                     ];
                 }
                 if (!empty($storeViewOptions)) {
@@ -397,8 +403,9 @@ class Websites extends AbstractModifier
         $this->websitesList = [];
         $groupList = $this->groupRepository->getList();
         $storesList = $this->storeRepository->getList();
+        $websiteList = $this->storeManager->getWebsites(true);
 
-        foreach ($this->websiteRepository->getList() as $website) {
+        foreach ($websiteList as $website) {
             $websiteId = $website->getId();
             if (!$websiteId) {
                 continue;

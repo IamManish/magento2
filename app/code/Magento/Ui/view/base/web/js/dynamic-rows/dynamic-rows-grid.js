@@ -34,6 +34,15 @@ define([
         },
 
         /**
+         * @inheritdoc
+         */
+        initialize: function () {
+            this.setToInsertData = _.debounce(this.setToInsertData, 200);
+
+            return this._super();
+        },
+
+        /**
          * Calls 'initObservable' of parent
          *
          * @returns {Object} Chainable.
@@ -109,9 +118,8 @@ define([
          * @param {String|Number} recordId
          */
         deleteRecord: function (index, recordId) {
-            this._super();
-
             this.updateInsertData(recordId);
+            this._super();
         },
 
         /**

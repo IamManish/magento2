@@ -4,7 +4,6 @@
  * See COPYING.txt for license details.
  */
 
-// @codingStandardsIgnoreFile
 namespace Magento\Customer\Test\Unit\Model\ResourceModel;
 
 use Magento\Framework\Model\ResourceModel\Db\VersionControl\RelationComposite;
@@ -33,9 +32,13 @@ class AddressTest extends \PHPUnit\Framework\TestCase
 
     protected function setUp()
     {
-        $this->entitySnapshotMock = $this->createMock(\Magento\Framework\Model\ResourceModel\Db\VersionControl\Snapshot::class);
+        $this->entitySnapshotMock = $this->createMock(
+            \Magento\Framework\Model\ResourceModel\Db\VersionControl\Snapshot::class
+        );
 
-        $this->entityRelationCompositeMock = $this->createMock(\Magento\Framework\Model\ResourceModel\Db\VersionControl\RelationComposite::class);
+        $this->entityRelationCompositeMock = $this->createMock(
+            \Magento\Framework\Model\ResourceModel\Db\VersionControl\RelationComposite::class
+        );
 
         $this->addressResource = (new ObjectManagerHelper($this))->getObject(
             \Magento\Customer\Test\Unit\Model\ResourceModel\SubResourceModelAddress::class,
@@ -157,7 +160,10 @@ class AddressTest extends \PHPUnit\Framework\TestCase
      */
     protected function prepareEavConfig()
     {
-        $attributeMock = $this->createPartialMock(\Magento\Eav\Model\Entity\Attribute\AbstractAttribute::class, ['getAttributeCode', 'getBackend', '__wakeup']);
+        $attributeMock = $this->createPartialMock(
+            \Magento\Eav\Model\Entity\Attribute\AbstractAttribute::class,
+            ['getAttributeCode', 'getBackend', '__wakeup']
+        );
         $attributeMock->expects($this->any())
             ->method('getAttributeCode')
             ->willReturn('entity_id');
@@ -167,12 +173,18 @@ class AddressTest extends \PHPUnit\Framework\TestCase
                 $this->createMock(\Magento\Eav\Model\Entity\Attribute\Backend\AbstractBackend::class)
             );
 
-        $this->eavConfigType = $this->createPartialMock(\Magento\Eav\Model\Entity\Type::class, ['getEntityIdField', 'getId', 'getEntityTable', '__wakeup']);
+        $this->eavConfigType = $this->createPartialMock(
+            \Magento\Eav\Model\Entity\Type::class,
+            ['getEntityIdField', 'getId', 'getEntityTable', '__wakeup']
+        );
         $this->eavConfigType->expects($this->any())->method('getEntityIdField')->willReturn(false);
         $this->eavConfigType->expects($this->any())->method('getId')->willReturn(false);
         $this->eavConfigType->expects($this->any())->method('getEntityTable')->willReturn('customer_address_entity');
 
-        $eavConfig = $this->createPartialMock(\Magento\Eav\Model\Config::class, ['getEntityType', 'getEntityAttributeCodes', 'getAttribute']);
+        $eavConfig = $this->createPartialMock(
+            \Magento\Eav\Model\Config::class,
+            ['getEntityType', 'getEntityAttributeCodes', 'getAttribute']
+        );
         $eavConfig->expects($this->any())
             ->method('getEntityType')
             ->with('customer_address')
@@ -227,6 +239,9 @@ class AddressTest extends \PHPUnit\Framework\TestCase
         return $validatorFactory;
     }
 
+    /**
+     * @return \Magento\Customer\Model\CustomerFactory|\PHPUnit_Framework_MockObject_MockObject
+     */
     protected function prepareCustomerFactory()
     {
         $this->customerFactory = $this->createPartialMock(\Magento\Customer\Model\CustomerFactory::class, ['create']);
@@ -243,23 +258,36 @@ class AddressTest extends \PHPUnit\Framework\TestCase
  * Class SubResourceModelAddress
  * Mock method getAttributeLoader
  * @package Magento\Customer\Test\Unit\Model\ResourceModel
+ * @codingStandardsIgnoreStart
  */
 class SubResourceModelAddress extends \Magento\Customer\Model\ResourceModel\Address
 {
     protected $attributeLoader;
 
+    /**
+     * @param null $object
+     *
+     * @return \Magento\Customer\Model\ResourceModel\Address|\Magento\Eav\Model\Entity\AbstractEntity
+     */
     public function loadAllAttributes($object = null)
     {
         return $this->getAttributeLoader()->loadAllAttributes($this, $object);
     }
 
+    /**
+     * @param $attributeLoader
+     */
     public function setAttributeLoader($attributeLoader)
     {
         $this->attributeLoader = $attributeLoader;
     }
 
+    /**
+     * @return \Magento\Eav\Model\Entity\AttributeLoaderInterface
+     */
     protected function getAttributeLoader()
     {
         return $this->attributeLoader;
     }
 }
+// @codingStandardsIgnoreEnd

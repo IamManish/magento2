@@ -105,7 +105,8 @@ class PostTest extends \PHPUnit\Framework\TestCase
     protected function setUp()
     {
         $this->redirect = $this->createMock(\Magento\Framework\App\Response\RedirectInterface::class);
-        $this->request = $this->createPartialMock(\Magento\Framework\App\Request\Http::class, ['getParam']);
+        $this->request = $this->createPartialMock(\Magento\Framework\App\Request\Http::class, ['getParam', 'isPost']);
+        $this->request->expects($this->any())->method('isPost')->willReturn(true);
         $this->response = $this->createPartialMock(\Magento\Framework\App\Response\Http::class, ['setRedirect']);
         $this->formKeyValidator = $this->createPartialMock(
             \Magento\Framework\Data\Form\FormKey\Validator::class,
@@ -147,7 +148,11 @@ class PostTest extends \PHPUnit\Framework\TestCase
         $ratingFactory->expects($this->once())->method('create')->willReturn($this->rating);
         $this->messageManager = $this->createMock(\Magento\Framework\Message\ManagerInterface::class);
 
-        $this->store = $this->createPartialMock(\Magento\Store\Model\Store::class, ['getId']);
+        $this->store = $this->createPartialMock(
+            \Magento\Store\Model\Store::class,
+            ['getId', 'getWebsiteId']
+        );
+
         $storeManager = $this->getMockForAbstractClass(\Magento\Store\Model\StoreManagerInterface::class);
         $storeManager->expects($this->any())->method('getStore')->willReturn($this->store);
 
@@ -211,15 +216,15 @@ class PostTest extends \PHPUnit\Framework\TestCase
         $this->reviewSession->expects($this->any())->method('getFormData')
             ->with(true)
             ->willReturn($reviewData);
-        $this->request->expects($this->at(0))->method('getParam')
-            ->with('category', false)
-            ->willReturn(false);
-        $this->request->expects($this->at(1))->method('getParam')
-            ->with('id')
-            ->willReturn(1);
+        $this->request->expects($this->any())->method('getParam')->willReturnMap(
+            [
+                ['category', false, false],
+                ['id', null, 1],
+            ]
+        );
         $product = $this->createPartialMock(
             \Magento\Catalog\Model\Product::class,
-            ['__wakeup', 'isVisibleInCatalog', 'isVisibleInSiteVisibility', 'getId']
+            ['__wakeup', 'isVisibleInCatalog', 'isVisibleInSiteVisibility', 'getId', 'getWebsiteIds']
         );
         $product->expects($this->once())
             ->method('isVisibleInCatalog')
@@ -227,6 +232,15 @@ class PostTest extends \PHPUnit\Framework\TestCase
         $product->expects($this->once())
             ->method('isVisibleInSiteVisibility')
             ->willReturn(true);
+
+        $product->expects($this->once())
+            ->method('getWebsiteIds')
+            ->willReturn([1]);
+
+        $this->store->expects($this->once())
+            ->method('getWebsiteId')
+            ->willReturn(1);
+
         $this->productRepository->expects($this->any())->method('getById')
             ->with(1)
             ->willReturn($product);

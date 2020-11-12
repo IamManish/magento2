@@ -298,6 +298,9 @@ class TemplateTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals($expectedTemplateStyles, $model->getTemplateStyles());
     }
 
+    /**
+     * @return array
+     */
     public function loadDefaultDataProvider()
     {
         return [
@@ -453,6 +456,9 @@ class TemplateTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals($expectedValue, $model->isValidForSend());
     }
 
+    /**
+     * @return array
+     */
     public function isValidForSendDataProvider()
     {
         return [
@@ -489,14 +495,20 @@ class TemplateTest extends \PHPUnit\Framework\TestCase
 
         $templateSubject = 'templateSubject';
         $model->setTemplateSubject($templateSubject);
+        $model->setTemplateId('123');
 
+        class_exists(Template::class, true);
         $filterTemplate = $this->getMockBuilder(\Magento\Framework\Filter\Template::class)
-            ->setMethods(['setVariables', 'setStoreId', 'filter'])
+            ->setMethods(['setVariables', 'setStoreId', 'filter', 'setStrictMode'])
             ->disableOriginalConstructor()
             ->getMock();
         $model->expects($this->once())
             ->method('getTemplateFilter')
-            ->will($this->returnValue($filterTemplate));
+            ->willReturn($filterTemplate);
+        $filterTemplate->expects($this->exactly(2))
+            ->method('setStrictMode')
+            ->withConsecutive([$this->equalTo(true)], [$this->equalTo(false)])
+            ->willReturnOnConsecutiveCalls(false, true);
 
         $model->expects($this->once())
             ->method('applyDesignConfig');
@@ -548,6 +560,9 @@ class TemplateTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals($expectedResult, $model->getVariablesOptionArray($withGroup));
     }
 
+    /**
+     * @return array
+     */
     public function getVariablesOptionArrayDataProvider()
     {
         return [
@@ -648,6 +663,9 @@ class TemplateTest extends \PHPUnit\Framework\TestCase
         $this->assertTrue($model->getUseAbsoluteLinks());
     }
 
+    /**
+     * @return array
+     */
     public function processTemplateVariable()
     {
         return [
@@ -744,6 +762,9 @@ class TemplateTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals($expectedResult, $model->getType());
     }
 
+    /**
+     * @return array
+     */
     public function getTypeDataProvider()
     {
         return [['text', 1], ['html', 2]];

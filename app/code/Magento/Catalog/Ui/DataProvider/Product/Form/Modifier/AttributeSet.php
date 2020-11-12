@@ -78,7 +78,13 @@ class AttributeSet extends AbstractModifier
                 \Magento\Eav\Model\ResourceModel\Entity\Attribute\Set\Collection::SORT_ORDER_ASC
             );
 
-        return $collection->getData();
+        $collectionData = $collection->getData() ?? [];
+
+        array_walk($collectionData, function (&$attribute) {
+            $attribute['__disableTmpl'] = true;
+        });
+
+        return $collectionData;
     }
 
     /**
@@ -108,6 +114,7 @@ class AttributeSet extends AbstractModifier
                     self::ATTRIBUTE_SET_FIELD_ORDER
                 ),
                 'multiple' => false,
+                'disabled' => $this->locator->getProduct()->isLockedAttribute('attribute_set_id'),
             ];
         }
 

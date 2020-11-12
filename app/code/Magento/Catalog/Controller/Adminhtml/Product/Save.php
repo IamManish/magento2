@@ -7,6 +7,7 @@
 namespace Magento\Catalog\Controller\Adminhtml\Product;
 
 use Magento\Backend\App\Action;
+use Magento\Catalog\Api\Data\ProductInterface;
 use Magento\Catalog\Controller\Adminhtml\Product;
 use Magento\Store\Model\StoreManagerInterface;
 use Magento\Framework\App\Request\DataPersistorInterface;
@@ -78,11 +79,12 @@ class Save extends \Magento\Catalog\Controller\Adminhtml\Product
     }
 
     /**
-     * Save product action
+     * Save product action.
      *
      * @return \Magento\Backend\Model\View\Result\Redirect
      * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      * @SuppressWarnings(PHPMD.NPathComplexity)
+     * @SuppressWarnings(PHPMD.ExcessiveMethodLength)
      */
     public function execute()
     {
@@ -101,12 +103,12 @@ class Save extends \Magento\Catalog\Controller\Adminhtml\Product
                     $this->productBuilder->build($this->getRequest())
                 );
                 $this->productTypeManager->processProduct($product);
-
                 if (isset($data['product'][$product->getIdFieldName()])) {
                     throw new \Magento\Framework\Exception\LocalizedException(__('Unable to save product'));
                 }
 
                 $originalSku = $product->getSku();
+                $canSaveCustomOptions = $product->getCanSaveCustomOptions();
                 $product->save();
                 $this->handleImageRemoveError($data, $product->getId());
                 $this->getCategoryLinkManagement()->assignProductToCategories(
@@ -116,9 +118,9 @@ class Save extends \Magento\Catalog\Controller\Adminhtml\Product
                 $productId = $product->getEntityId();
                 $productAttributeSetId = $product->getAttributeSetId();
                 $productTypeId = $product->getTypeId();
-
-                $this->copyToStores($data, $productId);
-
+                $extendedData = $data;
+                $extendedData['can_save_custom_options'] = $canSaveCustomOptions;
+                $this->copyToStores($extendedData, $productId);
                 $this->messageManager->addSuccessMessage(__('You saved the product.'));
                 $this->getDataPersistor()->clear('catalog_product');
                 if ($product->getSku() != $originalSku) {
@@ -140,17 +142,21 @@ class Save extends \Magento\Catalog\Controller\Adminhtml\Product
                 );
 
                 if ($redirectBack === 'duplicate') {
+                    $product->unsetData('quantity_and_stock_status');
                     $newProduct = $this->productCopier->copy($product);
+                    $this->checkUniqueAttributes($product);
                     $this->messageManager->addSuccessMessage(__('You duplicated the product.'));
                 }
             } catch (\Magento\Framework\Exception\LocalizedException $e) {
                 $this->_objectManager->get(\Psr\Log\LoggerInterface::class)->critical($e);
                 $this->messageManager->addExceptionMessage($e);
+                $data = isset($product) ? $this->persistMediaData($product, $data) : $data;
                 $this->getDataPersistor()->set('catalog_product', $data);
                 $redirectBack = $productId ? true : 'new';
             } catch (\Exception $e) {
                 $this->_objectManager->get(\Psr\Log\LoggerInterface::class)->critical($e);
                 $this->messageManager->addErrorMessage($e->getMessage());
+                $data = isset($product) ? $this->persistMediaData($product, $data) : $data;
                 $this->getDataPersistor()->set('catalog_product', $data);
                 $redirectBack = $productId ? true : 'new';
             }
@@ -213,6 +219,9 @@ class Save extends \Magento\Catalog\Controller\Adminhtml\Product
     /**
      * Do copying data to stores
      *
+     * If the 'copy_from' field is not specified in the input data,
+     * the store fallback mechanism will automatically take the admin store's default value.
+     *
      * @param array $data
      * @param int $productId
      * @return void
@@ -224,15 +233,18 @@ class Save extends \Magento\Catalog\Controller\Adminhtml\Product
                 if (isset($data['product']['website_ids'][$websiteId])
                     && (bool)$data['product']['website_ids'][$websiteId]) {
                     foreach ($group as $store) {
-                        $copyFrom = (isset($store['copy_from'])) ? $store['copy_from'] : 0;
-                        $copyTo = (isset($store['copy_to'])) ? $store['copy_to'] : 0;
-                        if ($copyTo) {
-                            $this->_objectManager->create(\Magento\Catalog\Model\Product::class)
-                                ->setStoreId($copyFrom)
-                                ->load($productId)
-                                ->setStoreId($copyTo)
-                                ->setCopyFromView(true)
-                                ->save();
+                        if (isset($store['copy_from'])) {
+                            $copyFrom = $store['copy_from'];
+                            $copyTo = (isset($store['copy_to'])) ? $store['copy_to'] : 0;
+                            if ($copyTo) {
+                                $this->_objectManager->create(\Magento\Catalog\Model\Product::class)
+                                    ->setStoreId($copyFrom)
+                                    ->load($productId)
+                                    ->setStoreId($copyTo)
+                                    ->setCanSaveCustomOptions($data['can_save_custom_options'])
+                                    ->setCopyFromView(true)
+                                    ->save();
+                            }
                         }
                     }
                 }
@@ -278,5 +290,58 @@ class Save extends \Magento\Catalog\Controller\Adminhtml\Product
         }
 
         return $this->dataPersistor;
+    }
+
+    /**
+     * Persist media gallery on error, in order to show already saved images on next run.
+     *
+     * @param ProductInterface $product
+     * @param array $data
+     * @return array
+     */
+    private function persistMediaData(ProductInterface $product, array $data)
+    {
+        $mediaGallery = $product->getData('media_gallery');
+        if (!empty($mediaGallery['images'])) {
+            foreach ($mediaGallery['images'] as $key => $image) {
+                if (!isset($image['new_file'])) {
+                    //Remove duplicates.
+                    unset($mediaGallery['images'][$key]);
+                }
+            }
+            $data['product']['media_gallery'] = $mediaGallery;
+            $fields = [
+                'image',
+                'small_image',
+                'thumbnail',
+                'swatch_image',
+            ];
+            foreach ($fields as $field) {
+                $data['product'][$field] = $product->getData($field);
+            }
+        }
+
+        return $data;
+    }
+
+    /**
+     * Check unique attributes and add error to message manager.
+     *
+     * @param \Magento\Catalog\Model\Product $product
+     */
+    private function checkUniqueAttributes(\Magento\Catalog\Model\Product $product)
+    {
+        $uniqueLabels = [];
+        foreach ($product->getAttributes() as $attribute) {
+            if ($attribute->getIsUnique() && $attribute->getIsUserDefined()
+                && !empty($product->getData($attribute->getAttributeCode()))
+            ) {
+                $uniqueLabels[] = $attribute->getDefaultFrontendLabel();
+            }
+        }
+        if ($uniqueLabels) {
+            $uniqueLabels = implode('", "', $uniqueLabels);
+            $this->messageManager->addErrorMessage(__('The value of attribute(s) "%1" must be unique', $uniqueLabels));
+        }
     }
 }

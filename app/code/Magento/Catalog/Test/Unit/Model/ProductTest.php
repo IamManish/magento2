@@ -4,12 +4,11 @@
  * See COPYING.txt for license details.
  */
 
-// @codingStandardsIgnoreFile
-
 namespace Magento\Catalog\Test\Unit\Model;
 
 use Magento\Catalog\Api\Data\ProductExtensionFactory;
 use Magento\Catalog\Api\Data\ProductExtensionInterface;
+use Magento\Catalog\Api\ProductLinkRepositoryInterface;
 use Magento\Catalog\Model\Product;
 use Magento\Framework\Api\Data\ImageContentInterface;
 use Magento\Framework\Api\ExtensibleDataInterface;
@@ -201,6 +200,16 @@ class ProductTest extends \PHPUnit\Framework\TestCase
     private $extensionAttributes;
 
     /**
+     * @var CacheInterface|\PHPUnit_Framework_MockObject_MockObject
+     */
+    private $cacheInterfaceMock;
+
+    /**
+     * @var \Magento\Eav\Model\Config|\PHPUnit_Framework_MockObject_MockObject
+     */
+    private $eavConfig;
+
+    /**
      * @SuppressWarnings(PHPMD.ExcessiveMethodLength)
      */
     protected function setUp()
@@ -246,11 +255,13 @@ class ProductTest extends \PHPUnit\Framework\TestCase
             \Magento\Framework\Model\ActionValidator\RemoveAction::class
         );
         $actionValidatorMock->expects($this->any())->method('isAllowed')->will($this->returnValue(true));
-        $cacheInterfaceMock = $this->createMock(\Magento\Framework\App\CacheInterface::class);
-
+        $this->cacheInterfaceMock = $this->createMock(\Magento\Framework\App\CacheInterface::class);
         $contextMock = $this->createPartialMock(
             \Magento\Framework\Model\Context::class,
-            ['getEventDispatcher', 'getCacheManager', 'getAppState', 'getActionValidator'], [], '', false
+            ['getEventDispatcher', 'getCacheManager', 'getAppState', 'getActionValidator'],
+            [],
+            '',
+            false
         );
         $contextMock->expects($this->any())->method('getAppState')->will($this->returnValue($this->appStateMock));
         $contextMock->expects($this->any())
@@ -258,7 +269,7 @@ class ProductTest extends \PHPUnit\Framework\TestCase
             ->will($this->returnValue($this->eventManagerMock));
         $contextMock->expects($this->any())
             ->method('getCacheManager')
-            ->will($this->returnValue($cacheInterfaceMock));
+            ->will($this->returnValue($this->cacheInterfaceMock));
         $contextMock->expects($this->any())
             ->method('getActionValidator')
             ->will($this->returnValue($actionValidatorMock));
@@ -345,8 +356,7 @@ class ProductTest extends \PHPUnit\Framework\TestCase
         $this->mediaGalleryEntryConverterPoolMock->expects($this->any())->method('getConverterByMediaType')->willReturn(
             $this->converterMock
         );
-        $this->productLinkRepositoryMock = $this->getMockBuilder(
-            \Magento\Catalog\Api\ProductLinkRepositoryInterface::class)
+        $this->productLinkRepositoryMock = $this->getMockBuilder(ProductLinkRepositoryInterface::class)
             ->disableOriginalConstructor()
             ->getMockForAbstractClass();
         $this->extensionAttributesFactory = $this->getMockBuilder(ExtensionAttributesFactory::class)
@@ -360,6 +370,7 @@ class ProductTest extends \PHPUnit\Framework\TestCase
             ->setMethods(['create'])
             ->getMock();
         $this->mediaConfig = $this->createMock(\Magento\Catalog\Model\Product\Media\Config::class);
+        $this->eavConfig = $this->createMock(\Magento\Eav\Model\Config::class);
 
         $this->extensionAttributes = $this->getMockBuilder(ProductExtensionInterface::class)
             ->setMethods(['getStockItem'])
@@ -397,7 +408,8 @@ class ProductTest extends \PHPUnit\Framework\TestCase
                 'catalogProductMediaConfig' => $this->mediaConfig,
                 '_filesystem' => $this->filesystemMock,
                 '_collectionFactory' => $this->collectionFactoryMock,
-                'data' => ['id' => 1]
+                'data' => ['id' => 1],
+                'eavConfig' => $this->eavConfig
             ]
         );
     }
@@ -502,6 +514,9 @@ class ProductTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals($initCategoryCollection, $result);
     }
 
+    /**
+     * @return array
+     */
     public function getCategoryCollectionCollectionNullDataProvider()
     {
         return [
@@ -529,6 +544,7 @@ class ProductTest extends \PHPUnit\Framework\TestCase
 
     public function testGetCategory()
     {
+        $this->model->setData('category_ids', [10]);
         $this->category->expects($this->any())->method('getId')->will($this->returnValue(10));
         $this->registry->expects($this->any())->method('registry')->will($this->returnValue($this->category));
         $this->categoryRepository->expects($this->any())->method('get')->will($this->returnValue($this->category));
@@ -537,12 +553,21 @@ class ProductTest extends \PHPUnit\Framework\TestCase
 
     public function testGetCategoryId()
     {
-        $this->category->expects($this->once())->method('getId')->will($this->returnValue(10));
+        $this->model->setData('category_ids', [10]);
+        $this->category->expects($this->any())->method('getId')->will($this->returnValue(10));
 
         $this->registry->expects($this->at(0))->method('registry');
         $this->registry->expects($this->at(1))->method('registry')->will($this->returnValue($this->category));
         $this->assertFalse($this->model->getCategoryId());
         $this->assertEquals(10, $this->model->getCategoryId());
+    }
+
+    public function testGetCategoryIdWhenProductNotInCurrentCategory()
+    {
+        $this->model->setData('category_ids', [12]);
+        $this->category->expects($this->once())->method('getId')->will($this->returnValue(10));
+        $this->registry->expects($this->any())->method('registry')->will($this->returnValue($this->category));
+        $this->assertFalse($this->model->getCategoryId());
     }
 
     public function testGetIdBySku()
@@ -612,13 +637,16 @@ class ProductTest extends \PHPUnit\Framework\TestCase
         $this->model->reindex();
     }
 
+    /**
+     * @return array
+     */
     public function getProductReindexProvider()
     {
-        return array(
+        return [
             'set 1' => [true, false, 1, 1],
             'set 2' => [true, true, 1, 0],
             'set 3' => [false, false, 1, 0]
-        );
+        ];
     }
 
     public function testPriceReindexCallback()
@@ -1159,19 +1187,18 @@ class ProductTest extends \PHPUnit\Framework\TestCase
         ];
 
         $entryMock = $this->getMockBuilder(\Magento\Catalog\Api\Data\ProductAttributeMediaGalleryEntryInterface::class)
-                          ->setMethods(
-                              [
-                                  'getId',
-                                  'getFile',
-                                  'getLabel',
-                                  'getPosition',
-                                  'isDisabled',
-                                  'types',
-                                  'getContent',
-                                  'getMediaType'
-                              ]
-                          )
-                          ->getMockForAbstractClass();
+            ->setMethods(
+                [
+                    'getId',
+                    'getFile',
+                    'getLabel',
+                    'getPosition',
+                    'isDisabled',
+                    'types',
+                    'getContent',
+                    'getMediaType'
+                ]
+            )->getMockForAbstractClass();
 
         $result = [
             'value_id' => 1,
@@ -1242,7 +1269,10 @@ class ProductTest extends \PHPUnit\Framework\TestCase
             ->disableOriginalConstructor()
             ->getMock();
         $this->collectionFactoryMock->expects($this->once())->method('create')->willReturn($imagesCollectionMock);
-        $imagesCollectionMock->expects($this->at(2))->method('getItemById')->with(1)->willReturn($expectedImageDataObject);
+        $imagesCollectionMock->expects($this->at(2))
+            ->method('getItemById')
+            ->with(1)
+            ->willReturn($expectedImageDataObject);
         $this->mediaConfig->expects($this->at(0))
             ->method('getMediaUrl')
             ->willReturn('http://magento.dev/pub/imageFile.jpg');
@@ -1265,18 +1295,11 @@ class ProductTest extends \PHPUnit\Framework\TestCase
     {
         $priceCode = 'price';
         $colorAttributeCode = 'color';
-        $interfaceAttribute = $this->createMock(\Magento\Framework\Api\MetadataObjectInterface::class);
-        $interfaceAttribute->expects($this->once())
-            ->method('getAttributeCode')
-            ->willReturn($priceCode);
-        $colorAttribute = $this->createMock(\Magento\Framework\Api\MetadataObjectInterface::class);
-        $colorAttribute->expects($this->once())
-            ->method('getAttributeCode')
-            ->willReturn($colorAttributeCode);
-        $customAttributesMetadata = [$interfaceAttribute, $colorAttribute];
+        $customAttributesMetadata = [$priceCode => 'attribute1', $colorAttributeCode => 'attribute2'];
 
-        $this->metadataServiceMock->expects($this->once())
-            ->method('getCustomAttributesMetadata')
+        $this->metadataServiceMock->expects($this->never())->method('getCustomAttributesMetadata');
+        $this->eavConfig->expects($this->once())
+            ->method('getEntityAttributes')
             ->willReturn($customAttributesMetadata);
         $this->model->setData($priceCode, 10);
 
@@ -1284,20 +1307,20 @@ class ProductTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals([], $this->model->getCustomAttributes());
 
         //Set the color attribute;
-        $this->model->setData($colorAttributeCode, "red");
+        $this->model->setData($colorAttributeCode, 'red');
         $attributeValue = new \Magento\Framework\Api\AttributeValue();
         $attributeValue2 = new \Magento\Framework\Api\AttributeValue();
         $this->attributeValueFactory->expects($this->exactly(2))->method('create')
             ->willReturnOnConsecutiveCalls($attributeValue, $attributeValue2);
         $this->assertEquals(1, count($this->model->getCustomAttributes()));
         $this->assertNotNull($this->model->getCustomAttribute($colorAttributeCode));
-        $this->assertEquals("red", $this->model->getCustomAttribute($colorAttributeCode)->getValue());
+        $this->assertEquals('red', $this->model->getCustomAttribute($colorAttributeCode)->getValue());
 
         //Change the attribute value, should reflect in getCustomAttribute
-        $this->model->setData($colorAttributeCode, "blue");
+        $this->model->setCustomAttribute($colorAttributeCode, 'blue');
         $this->assertEquals(1, count($this->model->getCustomAttributes()));
         $this->assertNotNull($this->model->getCustomAttribute($colorAttributeCode));
-        $this->assertEquals("blue", $this->model->getCustomAttribute($colorAttributeCode)->getValue());
+        $this->assertEquals('blue', $this->model->getCustomAttribute($colorAttributeCode)->getValue());
     }
 
     /**
@@ -1393,7 +1416,20 @@ class ProductTest extends \PHPUnit\Framework\TestCase
         $qty = 1;
         $this->model->setQty($qty);
         $this->model->setFinalPrice($finalPrice);
-        $this->productTypeInstanceMock->expects($this->never())->method('priceFactory');
+        $productTypePriceMock = $this->createPartialMock(
+            \Magento\Catalog\Model\Product\Type\Price::class,
+            ['getFinalPrice']
+        );
+        $productTypePriceMock->expects($this->any())
+            ->method('getFinalPrice')
+            ->with($qty, $this->model)
+            ->will($this->returnValue($finalPrice));
+
+        $this->productTypeInstanceMock->expects($this->any())
+            ->method('priceFactory')
+            ->with($this->model->getTypeId())
+            ->will($this->returnValue($productTypePriceMock));
+
         $this->assertEquals($finalPrice, $this->model->getFinalPrice($qty));
     }
 
@@ -1433,5 +1469,18 @@ class ProductTest extends \PHPUnit\Framework\TestCase
     public function testGetOptionByIdForProductWithoutOptions()
     {
         $this->assertNull($this->model->getOptionById(100));
+    }
+
+    public function testGetCacheTags()
+    {
+        //If entity is identified getCacheTags has to return the same values
+        //as getIdentities
+        $this->model->setId(null);
+        $this->assertEquals([Product::CACHE_TAG], $this->model->getCacheTags());
+        $this->model->setId(1);
+        $this->assertEquals(
+            $this->model->getIdentities(),
+            $this->model->getCacheTags()
+        );
     }
 }

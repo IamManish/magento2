@@ -4,8 +4,6 @@
  * See COPYING.txt for license details.
  */
 
-// @codingStandardsIgnoreFile
-
 namespace Magento\Weee\Test\Unit\Pricing;
 
 use \Magento\Weee\Pricing\Adjustment;
@@ -41,19 +39,17 @@ class AdjustmentTest extends \PHPUnit\Framework\TestCase
         $this->priceCurrencyMock = $this->createMock(\Magento\Framework\Pricing\PriceCurrencyInterface::class);
         $this->priceCurrencyMock->expects($this->any())
             ->method('convertAndRound')
-            ->will($this->returnCallback(
-                    function ($arg) {
-                        return round($arg * 0.5, 2);
-                    }
-                )
+            ->willReturnCallback(
+                function ($arg) {
+                    return round($arg * 0.5, 2);
+                }
             );
         $this->priceCurrencyMock->expects($this->any())
             ->method('convert')
-            ->will($this->returnCallback(
+            ->willReturnCallback(
                 function ($arg) {
                     return $arg * 0.5;
                 }
-            )
             );
 
         $this->adjustment = new Adjustment($this->weeeHelper, $this->priceCurrencyMock, $this->sortOrder);
@@ -134,6 +130,9 @@ class AdjustmentTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals($expectedResult, $this->adjustment->isExcludedWith($adjustmentCode));
     }
 
+    /**
+     * @return array
+     */
     public function isExcludedWithDataProvider()
     {
         return [
@@ -157,6 +156,9 @@ class AdjustmentTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals($expectedResult, $this->adjustment->getSortOrder());
     }
 
+    /**
+     * @return array
+     */
     public function getSortOrderProvider()
     {
         return [

@@ -4,8 +4,6 @@
  * See COPYING.txt for license details.
  */
 
-// @codingStandardsIgnoreFile
-
 namespace Magento\Payment\Test\Unit\Block\Info;
 
 /**
@@ -136,29 +134,22 @@ class SubstitutionTest extends \PHPUnit\Framework\TestCase
         $infoMock->expects($this->once())->method('getMethodInstance')->will($this->returnValue($methodMock));
         $this->block->setInfo($infoMock);
 
-        $fakeBlock = new \StdClass();
-        $this->layout->expects(
-            $this->any()
-        )->method(
-            'createBlock'
-        )->with(
-            \Magento\Framework\View\Element\Template::class,
-            '',
-            ['data' => ['method' => $methodMock, 'template' => 'Magento_Payment::info/substitution.phtml']]
-        )->will(
-                $this->returnValue(
-                    $fakeBlock
-                )
-            );
+        $fakeBlock = new \stdClass();
+        $this->layout->expects($this->any())
+            ->method('createBlock')
+            ->with(
+                \Magento\Framework\View\Element\Template::class,
+                '',
+                ['data' => ['method' => $methodMock, 'template' => 'Magento_Payment::info/substitution.phtml']]
+            )
+            ->willReturn($fakeBlock);
 
-        $childAbstractBlock->expects(
-            $this->any()
-        )->method(
-            'setChild'
-        )->with(
-            'order_payment_additional',
-            $fakeBlock
-        );
+        $childAbstractBlock->expects($this->any())
+            ->method('setChild')
+            ->with(
+                'order_payment_additional',
+                $fakeBlock
+            );
 
         $this->block->toHtml();
     }

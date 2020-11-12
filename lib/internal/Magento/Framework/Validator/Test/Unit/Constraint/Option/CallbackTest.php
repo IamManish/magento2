@@ -37,7 +37,6 @@ class CallbackTest extends \PHPUnit\Framework\TestCase
      */
     public function getConfigDataProvider()
     {
-        $functionName = create_function('', 'return "Value from function";');
         $closure = function () {
             return 'Value from closure';
         };
@@ -55,7 +54,6 @@ class CallbackTest extends \PHPUnit\Framework\TestCase
         );
 
         return [
-            [$functionName, 'Value from function'],
             [$closure, 'Value from closure'],
             [[$this, 'getTestValue'], self::TEST_VALUE],
             [[__CLASS__, 'getTestValueStatically'], self::TEST_VALUE],
@@ -123,7 +121,8 @@ class CallbackTest extends \PHPUnit\Framework\TestCase
     public function testGetValueException($callback, $expectedMessage, $createInstance = false)
     {
         $option = new \Magento\Framework\Validator\Constraint\Option\Callback($callback, null, $createInstance);
-        $this->expectException('InvalidArgumentException', $expectedMessage);
+        $this->expectException('InvalidArgumentException');
+        $this->expectExceptionMessage($expectedMessage);
         $option->getValue();
     }
 

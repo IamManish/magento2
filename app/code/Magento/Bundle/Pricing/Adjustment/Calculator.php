@@ -271,9 +271,8 @@ class Calculator implements BundleCalculatorInterface
     {
         if ($bundleProduct->getPriceType() == Price::PRICE_TYPE_FIXED) {
             return $this->calculateFixedBundleAmount($basePriceValue, $bundleProduct, $selectionPriceList, $exclude);
-        } else {
-            return $this->calculateDynamicBundleAmount($basePriceValue, $bundleProduct, $selectionPriceList, $exclude);
         }
+        return $this->calculateDynamicBundleAmount($basePriceValue, $bundleProduct, $selectionPriceList, $exclude);
     }
 
     /**
@@ -282,7 +281,7 @@ class Calculator implements BundleCalculatorInterface
      * @param float $basePriceValue
      * @param Product $bundleProduct
      * @param \Magento\Bundle\Pricing\Price\BundleSelectionPrice[] $selectionPriceList
-     * @param null|bool|string|arrayy $exclude
+     * @param null|bool|string|array $exclude
      * @return \Magento\Framework\Pricing\Amount\AmountInterface
      */
     protected function calculateFixedBundleAmount($basePriceValue, $bundleProduct, $selectionPriceList, $exclude)

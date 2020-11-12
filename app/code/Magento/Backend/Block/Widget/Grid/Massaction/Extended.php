@@ -5,6 +5,9 @@
  */
 namespace Magento\Backend\Block\Widget\Grid\Massaction;
 
+use Magento\Framework\Data\Collection\AbstractDb;
+use Magento\Framework\DB\Select;
+
 /**
  * Grid widget massaction block
  *
@@ -12,7 +15,7 @@ namespace Magento\Backend\Block\Widget\Grid\Massaction;
  * @deprecated 100.2.0 in favour of UI component implementation
  * @method \Magento\Quote\Model\Quote setHideFormElement(boolean $value) Hide Form element to prevent IE errors
  * @method boolean getHideFormElement()
- * @author      Magento Core Team <core@magentocommerce.com>
+ * @author Magento Core Team <core@magentocommerce.com>
  * @TODO MAGETWO-31510: Remove deprecated class
  * @since 100.0.2
  */
@@ -155,7 +158,7 @@ class Extended extends \Magento\Backend\Block\Widget
      */
     public function getCount()
     {
-        return sizeof($this->_items);
+        return count($this->_items);
     }
 
     /**
@@ -212,30 +215,30 @@ class Extended extends \Magento\Backend\Block\Widget
      * Retrieve JSON string of selected checkboxes
      *
      * @return string
+     * @SuppressWarnings(PHPMD.RequestAwareBlockMethod)
      */
     public function getSelectedJson()
     {
         if ($selected = $this->getRequest()->getParam($this->getFormFieldNameInternal())) {
             $selected = explode(',', $selected);
             return join(',', $selected);
-        } else {
-            return '';
         }
+        return '';
     }
 
     /**
      * Retrieve array of selected checkboxes
      *
      * @return string[]
+     * @SuppressWarnings(PHPMD.RequestAwareBlockMethod)
      */
     public function getSelected()
     {
         if ($selected = $this->getRequest()->getParam($this->getFormFieldNameInternal())) {
             $selected = explode(',', $selected);
             return $selected;
-        } else {
-            return [];
         }
+        return [];
     }
 
     /**
@@ -249,6 +252,8 @@ class Extended extends \Magento\Backend\Block\Widget
     }
 
     /**
+     * Get mass action javascript code
+     *
      * @return string
      */
     public function getJavaScript()
@@ -265,6 +270,8 @@ class Extended extends \Magento\Backend\Block\Widget
     }
 
     /**
+     * Get grid ids in JSON format
+     *
      * @return string
      */
     public function getGridIdsJson()
@@ -275,22 +282,31 @@ class Extended extends \Magento\Backend\Block\Widget
 
         /** @var \Magento\Framework\Data\Collection $allIdsCollection */
         $allIdsCollection = clone $this->getParentBlock()->getCollection();
-        
+
         if ($this->getMassactionIdField()) {
             $massActionIdField = $this->getMassactionIdField();
         } else {
             $massActionIdField = $this->getParentBlock()->getMassactionIdField();
         }
-        
-        $gridIds = $allIdsCollection->setPageSize(0)->getColumnValues($massActionIdField);
 
-        if (!empty($gridIds)) {
-            return join(",", $gridIds);
+        if ($allIdsCollection instanceof AbstractDb) {
+            $idsSelect = clone $allIdsCollection->getSelect();
+            $idsSelect->reset(Select::ORDER);
+            $idsSelect->reset(Select::LIMIT_COUNT);
+            $idsSelect->reset(Select::LIMIT_OFFSET);
+            $idsSelect->reset(Select::COLUMNS);
+            $idsSelect->columns($massActionIdField);
+            $idList = $allIdsCollection->getConnection()->fetchCol($idsSelect);
+        } else {
+            $idList = $allIdsCollection->setPageSize(0)->getColumnValues($massActionIdField);
         }
-        return '';
+
+        return implode(',', $idList);
     }
 
     /**
+     * Retrieve massaction block js object name
+     *
      * @return string
      */
     public function getHtmlId()

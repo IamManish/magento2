@@ -135,6 +135,7 @@ class AfterImportDataObserver implements ObserverInterface
         'url_path',
         'name',
         'visibility',
+        'save_rewrites_history'
     ];
 
     /**
@@ -199,6 +200,7 @@ class AfterImportDataObserver implements ObserverInterface
 
     /**
      * Action after data import.
+     *
      * Save new url rewrites and remove old if exist.
      *
      * @param Observer $observer
@@ -230,11 +232,8 @@ class AfterImportDataObserver implements ObserverInterface
     protected function _populateForUrlGeneration($rowData)
     {
         $newSku = $this->import->getNewSku($rowData[ImportProduct::COL_SKU]);
-        if (empty($newSku) || !isset($newSku['entity_id'])) {
-            return null;
-        }
-        if ($this->import->getRowScope($rowData) == ImportProduct::SCOPE_STORE
-            && empty($rowData[self::URL_KEY_ATTRIBUTE_CODE])) {
+        $oldSku = $this->import->getOldSku();
+        if (!$this->isNeedToPopulateForUrlGeneration($rowData, $newSku, $oldSku)) {
             return null;
         }
         $rowData['entity_id'] = $newSku['entity_id'];
@@ -267,6 +266,33 @@ class AfterImportDataObserver implements ObserverInterface
     }
 
     /**
+     * Check is need to populate data for url generation
+     *
+     * @param array $rowData
+     * @param array $newSku
+     * @param array $oldSku
+     * @return bool
+     */
+    private function isNeedToPopulateForUrlGeneration($rowData, $newSku, $oldSku): bool
+    {
+        if ((
+                (empty($newSku) || !isset($newSku['entity_id']))
+                || ($this->import->getRowScope($rowData) == ImportProduct::SCOPE_STORE
+                    && empty($rowData[self::URL_KEY_ATTRIBUTE_CODE]))
+                || (array_key_exists(strtolower($rowData[ImportProduct::COL_SKU]), $oldSku)
+                    && !isset($rowData[self::URL_KEY_ATTRIBUTE_CODE])
+                    && $this->import->getBehavior() === ImportExport::BEHAVIOR_APPEND)
+            )
+            && !isset($rowData["categories"])
+        ) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Add store id to product data.
+     *
      * @param \Magento\Catalog\Model\Product $product
      * @param array $rowData
      * @return void
@@ -436,6 +462,8 @@ class AfterImportDataObserver implements ObserverInterface
     }
 
     /**
+     * Generate url-rewrite for outogenerated url-rewirte.
+     *
      * @param UrlRewrite $url
      * @param Category $category
      * @return array
@@ -470,6 +498,8 @@ class AfterImportDataObserver implements ObserverInterface
     }
 
     /**
+     * Generate url-rewrite for custom url-rewirte.
+     *
      * @param UrlRewrite $url
      * @param Category $category
      * @return array
@@ -503,6 +533,8 @@ class AfterImportDataObserver implements ObserverInterface
     }
 
     /**
+     * Retrieve category from url metadata.
+     *
      * @param UrlRewrite $url
      * @return Category|null|bool
      */
@@ -517,6 +549,8 @@ class AfterImportDataObserver implements ObserverInterface
     }
 
     /**
+     * Check, category suited for url-rewrite generation.
+     *
      * @param \Magento\Catalog\Model\Category $category
      * @param int $storeId
      * @return bool

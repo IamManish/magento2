@@ -39,7 +39,7 @@ class Generator extends AbstractSchemaGenerator
     const UNAUTHORIZED_DESCRIPTION = '401 Unauthorized';
 
     /** Array signifier */
-    const ARRAY_SIGNIFIER = '[]';
+    const ARRAY_SIGNIFIER = '[0]';
 
     /**
      * Swagger factory instance.
@@ -134,7 +134,7 @@ class Generator extends AbstractSchemaGenerator
     }
 
     /**
-     * {@inheritdoc}
+     * @inheritdoc
      */
     protected function generateSchema($requestedServiceMetadata, $requestScheme, $requestHost, $endpointUrl)
     {
@@ -194,6 +194,32 @@ class Generator extends AbstractSchemaGenerator
     }
 
     /**
+     * List out consumes data type
+     *
+     * @return array
+     */
+    private function getConsumableDatatypes()
+    {
+        return [
+            'application/json',
+            'application/xml',
+        ];
+    }
+
+    /**
+     * List out produces data type
+     *
+     * @return array
+     */
+    private function getProducibleDatatypes()
+    {
+        return [
+            'application/json',
+            'application/xml',
+        ];
+    }
+
+    /**
      * Generate path info based on method data
      *
      * @param string $methodName
@@ -212,6 +238,8 @@ class Generator extends AbstractSchemaGenerator
             'tags' => [$tagName],
             'description' => $methodData['documentation'],
             'operationId' => $operationId,
+            'consumes' => $this->getConsumableDatatypes(),
+            'produces' => $this->getProducibleDatatypes(),
         ];
 
         $parameters = $this->generateMethodParameters($httpMethodData, $operationId);
@@ -407,7 +435,7 @@ class Generator extends AbstractSchemaGenerator
             if ($simpleType = $this->getSimpleType($trimedTypeName)) {
                 $result['items'] = ['type' => $simpleType];
             } else {
-                if (strpos($typeName, '[]')) {
+                if (strpos($typeName, '[]') !== false) {
                     $result['items'] = ['$ref' => $this->getDefinitionReference($trimedTypeName)];
                 } else {
                     $result = ['$ref' => $this->getDefinitionReference($trimedTypeName)];
@@ -602,7 +630,7 @@ class Generator extends AbstractSchemaGenerator
     /**
      * Get the CamelCased type name in 'hyphen-separated-lowercase-words' format
      *
-     * e.g. test-module5-v1-entity-all-soap-and-rest
+     * E.g. test-module5-v1-entity-all-soap-and-rest
      *
      * @param string $typeName
      * @return string
@@ -749,7 +777,8 @@ class Generator extends AbstractSchemaGenerator
     private function convertPathParams($uri)
     {
         $parts = explode('/', $uri);
-        for ($i=0; $i < count($parts); $i++) {
+        $count = count($parts);
+        for ($i=0; $i < $count; $i++) {
             if (strpos($parts[$i], ':') === 0) {
                 $parts[$i] = '{' . substr($parts[$i], 1) . '}';
             }
@@ -841,6 +870,17 @@ class Generator extends AbstractSchemaGenerator
             $description
         );
         $bodySchema['type'] = 'object';
+
+        /*
+         * Make sure we have a proper XML wrapper for request parameters for the XML format.
+         */
+        if (!isset($bodySchema['xml']) || !is_array($bodySchema['xml'])) {
+            $bodySchema['xml'] = [];
+        }
+        if (!isset($bodySchema['xml']['name']) || empty($bodySchema['xml']['name'])) {
+            $bodySchema['xml']['name'] = 'request';
+        }
+
         return $bodySchema;
     }
 
@@ -862,9 +902,17 @@ class Generator extends AbstractSchemaGenerator
             if (isset($parameters['result']['type'])) {
                 $schema = $this->getObjectSchema($parameters['result']['type'], $description);
             }
-            $responses['200']['description'] = '200 Success.';
+
+            // Some methods may have a non-standard HTTP success code.
+            $specificResponseData = $parameters['result']['response_codes']['success'] ?? [];
+            // Default HTTP success code to 200 if nothing has been supplied.
+            $responseCode = $specificResponseData['code'] ?? '200';
+            // Default HTTP response status to 200 Success if nothing has been supplied.
+            $responseDescription = $specificResponseData['description'] ?? '200 Success.';
+
+            $responses[$responseCode]['description'] = $responseDescription;
             if (!empty($schema)) {
-                $responses['200']['schema'] = $schema;
+                $responses[$responseCode]['schema'] = $schema;
             }
         }
         return $responses;

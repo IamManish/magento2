@@ -11,17 +11,20 @@ use Magento\Catalog\Api\Data\ProductRender\ImageInterface;
 use Magento\Catalog\Api\Data\ProductRender\ImageInterfaceFactory;
 use Magento\Catalog\Api\Data\ProductRenderInterface;
 use Magento\Catalog\Helper\ImageFactory;
+use Magento\Catalog\Model\Product\Image\NotLoadInfoImageException;
 use Magento\Catalog\Ui\DataProvider\Product\ProductRenderCollectorInterface;
 use Magento\Framework\App\State;
 use Magento\Framework\View\DesignInterface;
 use Magento\Store\Model\StoreManager;
 use Magento\Store\Model\StoreManagerInterface;
+use Magento\Framework\View\DesignLoader;
 
 /**
  * Collect enough information about image rendering on front
  * If you want to add new image, that should render on front you need
  * to configure this class in di.xml
  *
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
 class Image implements ProductRenderCollectorInterface
 {
@@ -59,6 +62,11 @@ class Image implements ProductRenderCollectorInterface
     private $imageRenderInfoFactory;
 
     /**
+     * @var DesignLoader
+     */
+    private $designLoader;
+
+    /**
      * Image constructor.
      * @param ImageFactory $imageFactory
      * @param State $state
@@ -66,6 +74,7 @@ class Image implements ProductRenderCollectorInterface
      * @param DesignInterface $design
      * @param ImageInterfaceFactory $imageRenderInfoFactory
      * @param array $imageCodes
+     * @param DesignLoader|null $designLoader
      */
     public function __construct(
         ImageFactory $imageFactory,
@@ -73,7 +82,8 @@ class Image implements ProductRenderCollectorInterface
         StoreManagerInterface $storeManager,
         DesignInterface $design,
         ImageInterfaceFactory $imageRenderInfoFactory,
-        array $imageCodes = []
+        array $imageCodes = [],
+        DesignLoader $designLoader = null
     ) {
         $this->imageFactory = $imageFactory;
         $this->imageCodes = $imageCodes;
@@ -81,6 +91,8 @@ class Image implements ProductRenderCollectorInterface
         $this->storeManager = $storeManager;
         $this->design = $design;
         $this->imageRenderInfoFactory = $imageRenderInfoFactory;
+        $this->designLoader = $designLoader ?: \Magento\Framework\App\ObjectManager::getInstance()
+            ->get(DesignLoader::class);
     }
 
     /**
@@ -102,7 +114,12 @@ class Image implements ProductRenderCollectorInterface
                     [$this, "emulateImageCreating"],
                     [$product, $imageCode, (int) $productRender->getStoreId(), $image]
                 );
-            $resizedInfo = $helper->getResizedImageInfo();
+
+            try {
+                $resizedInfo = $helper->getResizedImageInfo();
+            } catch (NotLoadInfoImageException $exception) {
+                $resizedInfo = [$helper->getWidth(), $helper->getHeight()];
+            }
 
             $image->setCode($imageCode);
             $image->setHeight($helper->getHeight());
@@ -118,6 +135,8 @@ class Image implements ProductRenderCollectorInterface
     }
 
     /**
+     * Callback for emulating image creation.
+     *
      * Callback in which we emulate initialize default design theme, depends on current store, be settings store id
      * from render info
      *
@@ -130,7 +149,7 @@ class Image implements ProductRenderCollectorInterface
     public function emulateImageCreating(ProductInterface $product, $imageCode, $storeId, ImageInterface $image)
     {
         $this->storeManager->setCurrentStore($storeId);
-        $this->design->setDefaultDesignTheme();
+        $this->designLoader->load();
 
         $imageHelper = $this->imageFactory->create();
         $imageHelper->init($product, $imageCode);

@@ -296,8 +296,6 @@ class Rule extends \Magento\Rule\Model\AbstractModel
                 $this->getUsesPerCoupon() ? $this->getUsesPerCoupon() : null
             )->setUsagePerCustomer(
                 $this->getUsesPerCustomer() ? $this->getUsesPerCustomer() : null
-            )->setExpirationDate(
-                $this->getToDate()
             )->save();
         } else {
             $this->getPrimaryCoupon()->delete();
@@ -499,8 +497,8 @@ class Rule extends \Magento\Rule\Model\AbstractModel
             $this->getUsesPerCoupon() ? $this->getUsesPerCoupon() : null
         )->setUsagePerCustomer(
             $this->getUsesPerCustomer() ? $this->getUsesPerCustomer() : null
-        )->setExpirationDate(
-            $this->getToDate()
+        )->setType(
+            \Magento\SalesRule\Api\Data\CouponInterface::TYPE_GENERATED
         );
 
         $couponCode = self::getCouponCodeGenerator()->generateCode();
@@ -521,7 +519,7 @@ class Rule extends \Magento\Rule\Model\AbstractModel
                         $coupon->setCode(
                             $couponCode . self::getCouponCodeGenerator()->getDelimiter() . sprintf(
                                 '%04u',
-                                rand(0, 9999)
+                                random_int(0, 9999)
                             )
                         );
                         continue;

@@ -5,6 +5,8 @@
  */
 namespace Magento\Ui\TemplateEngine\Xhtml;
 
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Serialize\Serializer\JsonHexTag;
 use Magento\Framework\View\Layout\Generator\Structure;
 use Magento\Framework\View\Element\UiComponentInterface;
 use Magento\Framework\View\TemplateEngine\Xhtml\Template;
@@ -43,24 +45,32 @@ class Result implements ResultInterface
     protected $logger;
 
     /**
+     * @var JsonHexTag
+     */
+    private $jsonSerializer;
+
+    /**
      * @param Template $template
      * @param CompilerInterface $compiler
      * @param UiComponentInterface $component
      * @param Structure $structure
      * @param LoggerInterface $logger
+     * @param JsonHexTag $jsonSerializer
      */
     public function __construct(
         Template $template,
         CompilerInterface $compiler,
         UiComponentInterface $component,
         Structure $structure,
-        LoggerInterface $logger
+        LoggerInterface $logger,
+        JsonHexTag $jsonSerializer = null
     ) {
         $this->template = $template;
         $this->compiler = $compiler;
         $this->component = $component;
         $this->structure = $structure;
         $this->logger = $logger;
+        $this->jsonSerializer = $jsonSerializer ?? ObjectManager::getInstance()->get(JsonHexTag::class);
     }
 
     /**
@@ -80,7 +90,9 @@ class Result implements ResultInterface
      */
     public function appendLayoutConfiguration()
     {
-        $layoutConfiguration = $this->wrapContent(json_encode($this->structure->generate($this->component)));
+        $layoutConfiguration = $this->wrapContent(
+            $this->jsonSerializer->serialize($this->structure->generate($this->component))
+        );
         $this->template->append($layoutConfiguration);
     }
 
@@ -119,7 +131,7 @@ class Result implements ResultInterface
     protected function wrapContent($content)
     {
         return '<script type="text/x-magento-init"><![CDATA['
-        . '{"*": {"Magento_Ui/js/core/app": ' . str_replace(['<![CDATA[', ']]>'], '', $content) . '}}'
+        . '{"*": {"Magento_Ui/js/core/app": ' . str_replace(']]>', ']]]]><![CDATA[>', $content) . '}}'
         . ']]></script>';
     }
 }

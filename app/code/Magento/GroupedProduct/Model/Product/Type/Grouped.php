@@ -208,7 +208,7 @@ class Grouped extends \Magento\Catalog\Model\Product\Type\AbstractType
             $collection = $this->getAssociatedProductCollection(
                 $product
             )->addAttributeToSelect(
-                ['name', 'price', 'special_price', 'special_from_date', 'special_to_date', 'tax_class_id']
+                ['name', 'price', 'special_price', 'special_from_date', 'special_to_date', 'tax_class_id', 'image']
             )->addFilterByRequiredOptions()->setPositionOrder()->addStoreFilter(
                 $this->getStoreFilter($product)
             )->addAttributeToFilter(
@@ -341,7 +341,7 @@ class Grouped extends \Magento\Catalog\Model\Product\Type\AbstractType
                 if ($isStrictProcessMode && !$subProduct->getQty()) {
                     return __('Please specify the quantity of product(s).')->render();
                 }
-                $productsInfo[$subProduct->getId()] = intval($subProduct->getQty());
+                $productsInfo[$subProduct->getId()] = $subProduct->isSalable() ? (float)$subProduct->getQty() : 0;
             }
         }
 

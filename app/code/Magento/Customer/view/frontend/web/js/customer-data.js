@@ -27,7 +27,8 @@ define([
 
     //TODO: remove global change, in this case made for initNamespaceStorage
     $.cookieStorage.setConf({
-        path: '/'
+        path: '/',
+        expires: 1
     });
 
     storage = $.initNamespaceStorage('mage-cache-storage').localStorage;
@@ -74,17 +75,17 @@ define([
 
         /**
          * @param {Object} sectionNames
-         * @param {Number} updateSectionId
+         * @param {Boolean} forceNewSectionTimestamp
          * @return {*}
          */
-        getFromServer: function (sectionNames, updateSectionId) {
+        getFromServer: function (sectionNames, forceNewSectionTimestamp) {
             var parameters;
 
             sectionNames = sectionConfig.filterClientSideSections(sectionNames);
             parameters = _.isArray(sectionNames) ? {
                 sections: sectionNames.join(',')
             } : [];
-            parameters['update_section_id'] = updateSectionId;
+            parameters['force_new_section_timestamp'] = forceNewSectionTimestamp;
 
             return $.getJSON(options.sectionLoadUrl, parameters).fail(function (jqXHR) {
                 throw new Error(jqXHR);
@@ -193,8 +194,7 @@ define([
          * Customer data initialization
          */
         init: function () {
-            var countryData,
-                privateContentVersion = 'private_content_version',
+            var privateContentVersion = 'private_content_version',
                 privateContent = $.cookieStorage.get(privateContentVersion),
                 localPrivateContent = $.localStorage.get(privateContentVersion),
                 needVersion = 'need_version',
@@ -213,6 +213,9 @@ define([
                     $.cookieStorage.set(privateContentVersion, privateContent);
                 }
                 $.localStorage.set(privateContentVersion, privateContent);
+                _.each(dataProvider.getFromStorage(storage.keys()), function (sectionData, sectionName) {
+                    buffer.notify(sectionName, sectionData);
+                });
                 this.reload([], false);
             } else if (expiredSectionNames.length > 0) {
                 _.each(dataProvider.getFromStorage(storage.keys()), function (sectionData, sectionName) {
@@ -226,14 +229,6 @@ define([
 
                 if (!_.isEmpty(storageInvalidation.keys())) {
                     this.reload(storageInvalidation.keys(), false);
-                }
-            }
-
-            if (!_.isEmpty(privateContent)) {
-                countryData = this.get('directory-data');
-
-                if (_.isEmpty(countryData())) {
-                    customerData.reload(['directory-data'], false);
                 }
             }
         },
@@ -321,12 +316,15 @@ define([
         },
 
         /**
+         * Avoid using this function directly 'cause of possible performance drawbacks.
+         * Each customer section reload brings new non-cached ajax request.
+         *
          * @param {Array} sectionNames
-         * @param {Number} updateSectionId
+         * @param {Boolean} forceNewSectionTimestamp
          * @return {*}
          */
-        reload: function (sectionNames, updateSectionId) {
-            return dataProvider.getFromServer(sectionNames, updateSectionId).done(function (sections) {
+        reload: function (sectionNames, forceNewSectionTimestamp) {
+            return dataProvider.getFromServer(sectionNames, forceNewSectionTimestamp).done(function (sections) {
                 $(document).trigger('customer-data-reload', [sectionNames]);
                 buffer.update(sections);
             });

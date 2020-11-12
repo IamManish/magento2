@@ -8,8 +8,10 @@
  */
 define([
     'mage/url',
-    'Magento_Ui/js/model/messageList'
-], function (url, globalMessageList) {
+    'Magento_Ui/js/model/messageList',
+    'consoleLogger',
+    'mage/translate'
+], function (url, globalMessageList, consoleLogger, $t) {
     'use strict';
 
     return {
@@ -25,7 +27,14 @@ define([
             if (response.status == 401) { //eslint-disable-line eqeqeq
                 window.location.replace(url.build('customer/account/login/'));
             } else {
-                error = JSON.parse(response.responseText);
+                try {
+                    error = JSON.parse(response.responseText);
+                } catch (e) {
+                    consoleLogger.error(e);
+                    error = {
+                        message: $t('Something went wrong with your request. Please try again later.')
+                    };
+                }
                 messageContainer.addErrorMessage(error);
             }
         }

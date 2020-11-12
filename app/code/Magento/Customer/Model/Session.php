@@ -354,8 +354,9 @@ class Session extends \Magento\Framework\Session\SessionManager
     }
 
     /**
-     * Get customer group id
-     * If customer is not logged in system, 'not logged in' group id will be returned
+     * Get customer group id.
+     *
+     * If customer is not logged in system, 'not logged in' group id will be returned.
      *
      * @return int
      */
@@ -407,24 +408,29 @@ class Session extends \Magento\Framework\Session\SessionManager
     }
 
     /**
+     * Sets customer as logged in.
+     *
      * @param Customer $customer
      * @return $this
      */
     public function setCustomerAsLoggedIn($customer)
     {
+        $this->regenerateId();
         $this->setCustomer($customer);
         $this->_eventManager->dispatch('customer_login', ['customer' => $customer]);
         $this->_eventManager->dispatch('customer_data_object_login', ['customer' => $this->getCustomerDataObject()]);
-        $this->regenerateId();
         return $this;
     }
 
     /**
+     * Sets customer as logged in.
+     *
      * @param CustomerData $customer
      * @return $this
      */
     public function setCustomerDataAsLoggedIn($customer)
     {
+        $this->regenerateId();
         $this->_httpContext->setValue(Context::CONTEXT_AUTH, true, false);
         $this->setCustomerData($customer);
 
@@ -487,7 +493,7 @@ class Session extends \Magento\Framework\Session\SessionManager
             $this->response->setRedirect($loginUrl);
         } else {
             $arguments = $this->_customerUrl->getLoginUrlParams();
-            if ($this->_session->getCookieShouldBeReceived() && $this->_createUrl()->getUseSession()) {
+            if ($this->_createUrl()->getUseSession()) {
                 $arguments += [
                     '_query' => [
                         $this->sidResolver->getSessionIdQueryParam($this->_session) => $this->_session->getSessionId(),
@@ -555,7 +561,7 @@ class Session extends \Magento\Framework\Session\SessionManager
     }
 
     /**
-     * Reset core session hosts after reseting session ID
+     * Reset core session hosts after resetting session ID
      *
      * @return $this
      */
@@ -567,6 +573,8 @@ class Session extends \Magento\Framework\Session\SessionManager
     }
 
     /**
+     * Creates \Magento\Framework\UrlInterface object.
+     *
      * @return \Magento\Framework\UrlInterface
      */
     protected function _createUrl()

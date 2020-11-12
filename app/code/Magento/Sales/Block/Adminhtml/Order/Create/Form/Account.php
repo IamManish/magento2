@@ -4,8 +4,6 @@
  * See COPYING.txt for license details.
  */
 
-// @codingStandardsIgnoreFile
-
 namespace Magento\Sales\Block\Adminhtml\Order\Create\Form;
 
 use Magento\Framework\Api\ExtensibleDataObjectConverter;
@@ -134,7 +132,9 @@ class Account extends AbstractForm
         $this->_addAttributesToForm($attributes, $fieldset);
 
         $this->_form->addFieldNameSuffix('order[account]');
-        $this->_form->setValues($this->getFormValues());
+
+        $formValues = $this->extractValuesFromAttributes($attributes);
+        $this->_form->setValues($formValues);
 
         return $this;
     }
@@ -149,7 +149,7 @@ class Account extends AbstractForm
     {
         switch ($element->getId()) {
             case 'email':
-                $element->setRequired(0);
+                $element->setRequired(1);
                 $element->setClass('validate-email admin__control-text');
                 break;
         }
@@ -168,7 +168,13 @@ class Account extends AbstractForm
         } catch (\Exception $e) {
             /** If customer does not exist do nothing. */
         }
-        $data = isset($customer) ? $this->_extensibleDataObjectConverter->toFlatArray($customer, [], \Magento\Customer\Api\Data\CustomerInterface::class) : [];
+        $data = isset($customer)
+            ? $this->_extensibleDataObjectConverter->toFlatArray(
+                $customer,
+                [],
+                \Magento\Customer\Api\Data\CustomerInterface::class
+            )
+            : [];
         foreach ($this->getQuote()->getData() as $key => $value) {
             if (strpos($key, 'customer_') === 0) {
                 $data[substr($key, 9)] = $value;
@@ -180,5 +186,24 @@ class Account extends AbstractForm
         }
 
         return $data;
+    }
+
+    /**
+     * Extract the form values from attributes.
+     *
+     * @param array $attributes
+     * @return array
+     */
+    private function extractValuesFromAttributes(array $attributes): array
+    {
+        $formValues = $this->getFormValues();
+        foreach ($attributes as $code => $attribute) {
+            $defaultValue = $attribute->getDefaultValue();
+            if (isset($defaultValue) && !isset($formValues[$code])) {
+                $formValues[$code] = $defaultValue;
+            }
+        }
+
+        return $formValues;
     }
 }

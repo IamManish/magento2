@@ -3,10 +3,17 @@
  * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
+declare(strict_types=1);
+
 namespace Magento\Captcha\Model;
+
+use Magento\Captcha\Helper\Data;
+use Magento\Framework\Math\Random;
 
 /**
  * Implementation of \Zend\Captcha\Image
+ *
+ * @SuppressWarnings(PHPMD.CookieAndSessionMisuse)
  *
  * @api
  * @since 100.0.2
@@ -29,7 +36,7 @@ class DefaultModel extends \Zend\Captcha\Image implements \Magento\Captcha\Model
     const DEFAULT_WORD_LENGTH_TO = 5;
 
     /**
-     * @var \Magento\Captcha\Helper\Data
+     * @var Data
      * @since 100.2.0
      */
     protected $captchaData;
@@ -77,23 +84,31 @@ class DefaultModel extends \Zend\Captcha\Image implements \Magento\Captcha\Model
     protected $session;
 
     /**
+     * @var Random
+     */
+    private $randomMath;
+
+    /**
      * @param \Magento\Framework\Session\SessionManagerInterface $session
      * @param \Magento\Captcha\Helper\Data $captchaData
      * @param ResourceModel\LogFactory $resLogFactory
      * @param string $formId
+     * @param Random $randomMath
      * @throws \Zend\Captcha\Exception\ExtensionNotLoadedException
      */
     public function __construct(
         \Magento\Framework\Session\SessionManagerInterface $session,
         \Magento\Captcha\Helper\Data $captchaData,
         \Magento\Captcha\Model\ResourceModel\LogFactory $resLogFactory,
-        $formId
+        $formId,
+        Random $randomMath = null
     ) {
         parent::__construct();
         $this->session = $session;
         $this->captchaData = $captchaData;
         $this->resLogFactory = $resLogFactory;
         $this->formId = $formId;
+        $this->randomMath = $randomMath ?? \Magento\Framework\App\ObjectManager::getInstance()->get(Random::class);
     }
 
     /**
@@ -125,8 +140,8 @@ class DefaultModel extends \Zend\Captcha\Image implements \Magento\Captcha\Model
      */
     public function isRequired($login = null)
     {
-        if ($this->isUserAuth()
-            && !$this->isShownToLoggedInUser()
+        if (($this->isUserAuth()
+                && !$this->isShownToLoggedInUser())
             || !$this->isEnabled()
             || !in_array(
                 $this->formId,
@@ -375,23 +390,9 @@ class DefaultModel extends \Zend\Captcha\Image implements \Magento\Captcha\Model
      */
     protected function generateWord()
     {
-        $word = '';
-        $symbols = $this->getSymbols();
+        $symbols = (string)$this->captchaData->getConfig('symbols');
         $wordLen = $this->getWordLen();
-        for ($i = 0; $i < $wordLen; $i++) {
-            $word .= $symbols[array_rand($symbols)];
-        }
-        return $word;
-    }
-
-    /**
-     * Get symbols array to use for word generation
-     *
-     * @return array
-     */
-    private function getSymbols()
-    {
-        return str_split((string)$this->captchaData->getConfig('symbols'));
+        return $this->randomMath->getRandomString($wordLen, $symbols);
     }
 
     /**
@@ -431,12 +432,14 @@ class DefaultModel extends \Zend\Captcha\Image implements \Magento\Captcha\Model
      */
     private function isShowAlways()
     {
-        if ((string)$this->captchaData->getConfig('mode') == \Magento\Captcha\Helper\Data::MODE_ALWAYS) {
+        $captchaMode = (string)$this->captchaData->getConfig('mode');
+
+        if ($captchaMode === Data::MODE_ALWAYS) {
             return true;
         }
 
-        if ((string)$this->captchaData->getConfig('mode') == \Magento\Captcha\Helper\Data::MODE_AFTER_FAIL
-            && $this->getAllowedAttemptsForSameLogin() == 0
+        if ($captchaMode === Data::MODE_AFTER_FAIL
+            && $this->getAllowedAttemptsForSameLogin() === 0
         ) {
             return true;
         }

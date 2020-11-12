@@ -249,7 +249,7 @@ class EmailSenderTest extends \PHPUnit\Framework\TestCase
 
         $this->shipmentMock->expects($this->once())
             ->method('setSendEmail')
-            ->with(true);
+            ->with($emailSendingResult);
 
         if (!$configValue || $forceSyncMode) {
             $transport = [
@@ -262,6 +262,7 @@ class EmailSenderTest extends \PHPUnit\Framework\TestCase
                 'formattedShippingAddress' => 'Formatted address',
                 'formattedBillingAddress' => 'Formatted address',
             ];
+            $transport = new \Magento\Framework\DataObject($transport);
 
             $this->eventManagerMock->expects($this->once())
                 ->method('dispatch')
@@ -269,15 +270,16 @@ class EmailSenderTest extends \PHPUnit\Framework\TestCase
                     'email_shipment_set_template_vars_before',
                     [
                         'sender' => $this->subject,
-                        'transport' => $transport,
+                        'transport' => $transport->getData(),
+                        'transportObject' => $transport,
                     ]
                 );
 
             $this->templateContainerMock->expects($this->once())
                 ->method('setTemplateVars')
-                ->with($transport);
+                ->with($transport->getData());
 
-            $this->identityContainerMock->expects($this->once())
+            $this->identityContainerMock->expects($this->exactly(2))
                 ->method('isEnabled')
                 ->willReturn($emailSendingResult);
 

@@ -14,6 +14,7 @@ use Magento\Sales\Model\Order\Email\Sender;
 use Magento\Sales\Model\ResourceModel\Order\Creditmemo as CreditmemoResource;
 use Magento\Sales\Model\Order\Address\Renderer;
 use Magento\Framework\Event\ManagerInterface;
+use Magento\Framework\DataObject;
 
 /**
  * Class CreditmemoSender
@@ -95,14 +96,16 @@ class CreditmemoSender extends Sender
      * @param Creditmemo $creditmemo
      * @param bool $forceSyncMode
      * @return bool
+     * @throws \Exception
      */
     public function send(Creditmemo $creditmemo, $forceSyncMode = false)
     {
-        $creditmemo->setSendEmail(true);
+        $creditmemo->setSendEmail($this->identityContainer->isEnabled());
 
         if (!$this->globalConfig->getValue('sales_email/general/async_sending') || $forceSyncMode) {
             $order = $creditmemo->getOrder();
-            
+            $this->identityContainer->setStore($order->getStore());
+
             $transport = [
                 'order' => $order,
                 'creditmemo' => $creditmemo,
@@ -112,14 +115,24 @@ class CreditmemoSender extends Sender
                 'store' => $order->getStore(),
                 'formattedShippingAddress' => $this->getFormattedShippingAddress($order),
                 'formattedBillingAddress' => $this->getFormattedBillingAddress($order),
+                'order_data' => [
+                    'customer_name' => $order->getCustomerName(),
+                    'is_not_virtual' => $order->getIsNotVirtual(),
+                    'email_customer_note' => $order->getEmailCustomerNote(),
+                    'frontend_status_label' => $order->getFrontendStatusLabel()
+                ]
             ];
+            $transportObject = new DataObject($transport);
 
+            /**
+             * Event argument `transport` is @deprecated. Use `transportObject` instead.
+             */
             $this->eventManager->dispatch(
                 'email_creditmemo_set_template_vars_before',
-                ['sender' => $this, 'transport' => $transport]
+                ['sender' => $this, 'transport' => $transportObject->getData(), 'transportObject' => $transportObject]
             );
 
-            $this->templateContainer->setTemplateVars($transport);
+            $this->templateContainer->setTemplateVars($transportObject->getData());
 
             if ($this->checkAndSend($order)) {
                 $creditmemo->setEmailSent(true);
@@ -141,6 +154,7 @@ class CreditmemoSender extends Sender
      *
      * @param Order $order
      * @return string
+     * @throws \Exception
      */
     protected function getPaymentHtml(Order $order)
     {

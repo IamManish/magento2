@@ -161,7 +161,8 @@ class LinkRepositoryTest extends \PHPUnit\Framework\TestCase
                     'getNumberOfDownloads',
                     'getIsShareable',
                     'getLinkUrl',
-                    'getLinkFile'
+                    'getLinkFile',
+                    'hasSampleType',
                 ]
             )
             ->getMockForAbstractClass();
@@ -435,6 +436,8 @@ class LinkRepositoryTest extends \PHPUnit\Framework\TestCase
             'price' => 10.1,
             'number_of_downloads' => 100,
             'is_shareable' => true,
+            'link_type' => 'url',
+            'link_url' => 'https://google.com',
         ];
         $this->repositoryMock->expects($this->any())->method('get')->with($productSku, true)
             ->will($this->returnValue($this->productMock));
@@ -539,6 +542,10 @@ class LinkRepositoryTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals([$linkInterfaceMock], $this->service->getList($productSku));
     }
 
+    /**
+     * @param $resource
+     * @param $inputData
+     */
     protected function setLinkAssertions($resource, $inputData)
     {
         $resource->expects($this->any())->method('getId')->will($this->returnValue($inputData['id']));

@@ -1,11 +1,8 @@
 <?php
 /**
- *
  * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
-
-// @codingStandardsIgnoreFile
 
 namespace Magento\Multishipping\Test\Unit\Block\Checkout;
 
@@ -50,20 +47,21 @@ class SuccessTest extends \PHPUnit\Framework\TestCase
         $this->model = $objectManager->getObject(
             \Magento\Multishipping\Block\Checkout\Success::class,
             [
-                'context' => $this->contextMock
-            ]);
+                'context' => $this->contextMock,
+            ]
+        );
     }
 
     public function testGetOrderIdsWithoutId()
     {
-        $this->sessionMock->expects($this->once())->method('getOrderIds')->with(true)->will($this->returnValue(null));
+        $this->sessionMock->method('getOrderIds')->willReturn(null);
 
         $this->assertFalse($this->model->getOrderIds());
     }
 
     public function testGetOrderIdsWithEmptyIdsArray()
     {
-        $this->sessionMock->expects($this->once())->method('getOrderIds')->with(true)->will($this->returnValue([]));
+        $this->sessionMock->method('getOrderIds')->willReturn([]);
 
         $this->assertFalse($this->model->getOrderIds());
     }
@@ -71,7 +69,7 @@ class SuccessTest extends \PHPUnit\Framework\TestCase
     public function testGetOrderIds()
     {
         $ids = [100, 102, 103];
-        $this->sessionMock->expects($this->once())->method('getOrderIds')->with(true)->will($this->returnValue($ids));
+        $this->sessionMock->method('getOrderIds')->willReturn($ids);
 
         $this->assertEquals($ids, $this->model->getOrderIds());
     }

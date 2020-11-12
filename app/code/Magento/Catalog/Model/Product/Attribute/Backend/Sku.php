@@ -4,8 +4,6 @@
  * See COPYING.txt for license details.
  */
 
-// @codingStandardsIgnoreFile
-
 /**
  * Catalog product SKU backend attribute model
  *
@@ -52,7 +50,9 @@ class Sku extends \Magento\Eav\Model\Entity\Attribute\Backend\AbstractBackend
         $attrCode = $this->getAttribute()->getAttributeCode();
         $value = $object->getData($attrCode);
         if ($this->getAttribute()->getIsRequired() && strlen($value) === 0) {
-            throw new \Magento\Framework\Exception\LocalizedException(__('The value of attribute "%1" must be set', $attrCode));
+            throw new \Magento\Framework\Exception\LocalizedException(
+                __('The value of attribute "%1" must be set', $attrCode)
+            );
         }
 
         if ($this->string->strlen($object->getSku()) > self::SKU_MAX_LENGTH) {
@@ -97,6 +97,7 @@ class Sku extends \Magento\Eav\Model\Entity\Attribute\Backend\AbstractBackend
     public function beforeSave($object)
     {
         $this->_generateUniqueSku($object);
+        $this->trimValue($object);
         return parent::beforeSave($object);
     }
 
@@ -126,5 +127,18 @@ class Sku extends \Magento\Eav\Model\Entity\Attribute\Backend\AbstractBackend
         );
         $data = $connection->fetchOne($select, $bind);
         return abs((int)str_replace($value, '', $data));
+    }
+
+    /**
+     * @param Product $object
+     * @return void
+     */
+    private function trimValue($object)
+    {
+        $attrCode = $this->getAttribute()->getAttributeCode();
+        $value = $object->getData($attrCode);
+        if ($value) {
+            $object->setData($attrCode, trim($value));
+        }
     }
 }

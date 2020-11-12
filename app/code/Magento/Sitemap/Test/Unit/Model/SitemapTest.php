@@ -160,7 +160,7 @@ class SitemapTest extends \PHPUnit\Framework\TestCase
      * Check not exists sitemap path validation
      *
      * @expectedException \Magento\Framework\Exception\LocalizedException
-     * @expectedExceptionMessage Please create the specified folder "" before saving the sitemap.
+     * @expectedExceptionMessage Please create the specified folder "/" before saving the sitemap.
      */
     public function testPathNotExists()
     {
@@ -253,6 +253,8 @@ class SitemapTest extends \PHPUnit\Framework\TestCase
             $expectedWrites,
             null
         );
+        $this->storeManagerMock->expects($this->once())->method('setCurrentStore')->with(1);
+
         $model->generateXml();
 
         $this->assertCount(count($expectedFile), $actualData, 'Number of generated files is incorrect');
@@ -360,6 +362,8 @@ class SitemapTest extends \PHPUnit\Framework\TestCase
             $expectedWrites,
             $robotsInfo
         );
+        $this->storeManagerMock->expects($this->once())->method('setCurrentStore')->with(1);
+
         $model->generateXml();
     }
 
@@ -531,7 +535,7 @@ class SitemapTest extends \PHPUnit\Framework\TestCase
             )
         );
 
-        $storeBaseMediaUrl = 'http://store.com/pub/media/catalog/product/cache/c9e0b0ef589f3508e5ba515cde53c5ff/';
+        $storeBaseMediaUrl = 'http://store.com/pub/media/catalog/product/cache/10f519365b01716ddb90abc57de5a837/';
         $this->_sitemapProductMock->expects(
             $this->any()
         )->method(
@@ -632,16 +636,27 @@ class SitemapTest extends \PHPUnit\Framework\TestCase
             ->setMethods(['getStore'])
             ->getMockForAbstractClass();
 
+        $escaper = $this->getMockBuilder(\Magento\Framework\Escaper::class)
+            ->setMethods(['escapeHtml'])
+            ->disableOriginalConstructor()
+            ->getMock();
+        $escaper->expects($this->any())->method('escapeHtml')->willReturnArgument(0);
+
         $objectManager = new \Magento\Framework\TestFramework\Unit\Helper\ObjectManager($this);
+        $escaper = $objectManager->getObject(
+            \Magento\Framework\Escaper::class
+        );
         $constructArguments = $objectManager->getConstructArguments(
             \Magento\Sitemap\Model\Sitemap::class,
             [
+                'escaper' => $escaper,
                 'categoryFactory' => $categoryFactory,
                 'productFactory' => $productFactory,
                 'cmsFactory' => $cmsFactory,
                 'storeManager' => $this->storeManagerMock,
                 'sitemapData' => $this->_helperMockSitemap,
-                'filesystem' => $this->_filesystemMock
+                'filesystem' => $this->_filesystemMock,
+                'escaper' => $escaper
             ]
         );
         $constructArguments['resource'] = null;
